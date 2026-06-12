@@ -19,7 +19,6 @@ and prints the manifest's sha256 (commit this in genesis).
 
 import argparse
 import hashlib
-import json
 import os
 import sys
 import urllib.request

@@ -428,12 +428,17 @@
       <h2><span class="n">16</span>Determinism &amp; limitations</h2>
       <p>This is a research prototype. Known limitations:</p>
       <ul>
-        <li><strong>Synthetic instances.</strong> For now <code>docking</code> and <code>mcs-protein</code> instances are
-        synthesized deterministically from the seed so the package runs with no external data. Real deployment loads
-        ESM Atlas contact maps / Enamine ligands into the same instance spec — the verifier and scorer are unchanged.</li>
-        <li><strong>Instance generation PRNG.</strong> Instance synthesis uses Python’s RNG, so cross-language nodes
-        would need a specified PRNG. The consensus path (verify/score) is already pure integer arithmetic and is
-        language-agnostic.</li>
+        <li><strong>Real data: available for MCS.</strong> <code>mcs-protein</code> can run on a real,
+        content-addressed corpus of protein contact graphs (genesis commits the manifest hash; each fetched blob is
+        verified against its sha256, so the mirror is untrusted). Build one with <code>tools/build_corpus.py</code> and
+        seed with <code>crick init --manifest &lt;url&gt;</code>. Its verifier is pure integer, so no consensus change
+        was needed.</li>
+        <li><strong>Docking on real data is pending</strong> the deterministic fixed-point scoring function over
+        quantized real coordinates; until then docking uses synthetic instances. The default <code>--problem</code>
+        mode (no manifest) also synthesizes instances from the seed so the package runs with no external data.</li>
+        <li><strong>Determinism.</strong> With a content-addressed corpus, correctness rests only on the integer
+        verifier/scorer, which is language-agnostic. Synthetic instance generation still uses Python’s RNG, so a
+        cross-language network would either use real corpora or a specified PRNG.</li>
         <li><strong>Networking.</strong> HTTP gossip with manual peer seeding — no peer discovery, NAT traversal, or
         encrypted transport.</li>
         <li><strong>Single chain head.</strong> Fork choice re-validates whole chains rather than maintaining a header

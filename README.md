@@ -78,11 +78,31 @@ precomputing a meaningful fraction *is* the useful science, which is what defuse
 the Bubka hoarding attack. New problems implement the `Problem` interface in
 `crick/puzzle.py` and register via `@register_problem`.
 
-> **Prototype note:** so the package runs with no external data, `docking` and
-> `mcs-protein` instances are synthesised deterministically from the network seed.
-> The instance spec carries the full data, so production swaps in real ESM Atlas
-> contact maps / Enamine ligands by populating the same fields — the consensus
-> code (verify/score) is unchanged.
+By default (`--problem`) instances are synthesised deterministically from the
+network seed, so the package runs with no external data. For **real data**, see below.
+
+### Real data (content-addressed corpus)
+
+`mcs-protein` can run on real protein structures. A corpus is built offline and
+served from any mirror; genesis commits the manifest's hash, and every fetched
+blob is verified against its `sha256` — so the mirror need not be trusted, and a
+wrong byte is rejected. (Determinism then rests only on the integer verifier, not
+on any shared RNG.)
+
+```sh
+# 1. build a corpus from real PDB structures (Cα contact graphs, integer edges)
+python tools/build_corpus.py --out ./corpus 1CRN 1L2Y 1VII 1ENH 1PGB
+
+# 2. host it anywhere static (the hashes make the host untrusted)
+python -m http.server 8000 --directory ./corpus
+
+# 3. seed a chain from the manifest (pins its hash in genesis)
+crick init --manifest http://your-mirror:8000/manifest.json
+crick node --mine --explorer
+```
+
+Docking on real data additionally needs a deterministic fixed-point scoring
+function (planned); MCS is already pure-integer, so it works today.
 
 ## Install
 
