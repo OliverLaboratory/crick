@@ -18,10 +18,12 @@ import threading
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import List, Optional
+from urllib.parse import parse_qs
 
 from .block import Block, Transaction
 from .chain import Blockchain, ValidationError
 from .crypto import Wallet
+from .explorer import EXPLORER_HTML
 from .miner import mine_block
 
 
@@ -148,9 +150,24 @@ class Node:
                       f"{block.hash[:16]}…")
                 self._after_new_tip(announce=True)
 
+    def explorer_data(self, limit: int = 30) -> dict:
+        with self.lock:
+            c = self.chain
+            blocks = [{"height": b.height, "timestamp": b.timestamp, "miner": b.miner,
+                       "difficulty": b.difficulty, "has_solution": b.has_solution,
+                       "hash": b.hash} for b in c.blocks[-limit:]]
+            return {
+                "summary": self.status(),
+                "epoch_index": c.epoch_index,
+                "problem": c.problem.describe(),
+                "best": c.problem.summary(c.best_solution),
+                "best_solution": c.best_solution,
+                "blocks": blocks,
+            }
+
     # ---------------------------------------------------------------- serving
 
-    def serve(self, mine: bool = False, solve: bool = True) -> None:
+    def serve(self, mine: bool = False, solve: bool = True, explorer: bool = False) -> None:
         node = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -165,12 +182,32 @@ class Node:
                 self.end_headers()
                 self.wfile.write(body)
 
+            def _send_html(self, html: str) -> None:
+                body = html.encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
             def _read_body(self) -> dict:
                 length = int(self.headers.get("Content-Length", 0))
                 return json.loads(self.rfile.read(length).decode() or "{}")
 
             def do_GET(self):
-                if self.path == "/status":
+                path = self.path.split("?", 1)[0]
+                if explorer and path in ("/", "/index.html"):
+                    self._send_html(EXPLORER_HTML)
+                elif explorer and path == "/explorer/data":
+                    limit = 30
+                    if "?" in self.path:
+                        q = parse_qs(self.path.split("?", 1)[1])
+                        try:
+                            limit = max(1, min(200, int(q.get("limit", ["30"])[0])))
+                        except ValueError:
+                            limit = 30
+                    self._send(200, node.explorer_data(limit))
+                elif self.path == "/status":
                     self._send(200, node.status())
                 elif self.path == "/chain":
                     with node.lock:
@@ -216,7 +253,8 @@ class Node:
             threading.Thread(target=self._mine_loop, args=(solve,), daemon=True).start()
         print(f"crick node listening on http://{self.host}:{self.port} "
               f"(height {self.chain.height}, d_b={self.chain.d_b:.0f}, "
-              f"d_r={self.chain.d_r:.0f}, best clique k={self.chain.best_score})")
+              f"d_r={self.chain.d_r:.0f}, best score {self.chain.best_score})"
+              + ("  [explorer at /]" if explorer else ""))
         try:
             server.serve_forever()
         except KeyboardInterrupt:

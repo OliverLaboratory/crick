@@ -97,7 +97,7 @@ def cmd_node(args) -> None:
                 public_url=args.public_url)
     for peer in args.peer or []:
         node.add_peer(peer)
-    node.serve(mine=args.mine, solve=not args.no_solve)
+    node.serve(mine=args.mine, solve=not args.no_solve, explorer=args.explorer)
 
 
 def cmd_wallet(args) -> None:
@@ -166,6 +166,8 @@ def main(argv=None) -> None:
                    help="URL peers should use to reach this node")
     p.add_argument("--mine", action="store_true", help="mine while serving")
     p.add_argument("--no-solve", action="store_true")
+    p.add_argument("--explorer", action="store_true",
+                   help="serve the web block explorer at /")
     p.set_defaults(func=cmd_node)
 
     p = sub.add_parser("wallet", help="show wallet info")
