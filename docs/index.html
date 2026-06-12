@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>crick — proof of work that's worth the work</title>
+<meta name="description" content="crick is a proof-of-work blockchain that redirects mining energy toward solving NP-complete problems of scientific interest.">
+<style>
+  :root {
+    --bg: #0b0e14;
+    --bg-soft: #11151f;
+    --card: #161b27;
+    --line: #232a3a;
+    --text: #dde3ee;
+    --muted: #8b94a7;
+    --accent: #4fd6a5;
+    --accent-2: #6ea8fe;
+    --mono: "SF Mono", ui-monospace, "Cascadia Code", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 17px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+  }
+  a { color: var(--accent-2); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 24px; }
+
+  nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 0; border-bottom: 1px solid var(--line);
+  }
+  .logo { font-family: var(--mono); font-size: 20px; font-weight: 700; color: var(--text); }
+  .logo span { color: var(--accent); }
+  nav .links a { color: var(--muted); margin-left: 24px; font-size: 15px; }
+  nav .links a:hover { color: var(--text); text-decoration: none; }
+
+  header.hero { padding: 96px 0 72px; text-align: center; }
+  .hero h1 {
+    font-size: clamp(34px, 5.5vw, 56px); line-height: 1.12; font-weight: 800;
+    letter-spacing: -0.02em; margin-bottom: 20px;
+  }
+  .hero h1 em {
+    font-style: normal;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero p.tag { color: var(--muted); font-size: 20px; max-width: 640px; margin: 0 auto 36px; }
+  .cta { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-block; padding: 12px 26px; border-radius: 10px;
+    font-weight: 600; font-size: 16px;
+  }
+  .btn.primary { background: var(--accent); color: #06281c; }
+  .btn.primary:hover { filter: brightness(1.1); text-decoration: none; }
+  .btn.ghost { border: 1px solid var(--line); color: var(--text); }
+  .btn.ghost:hover { border-color: var(--accent-2); text-decoration: none; }
+
+  .term {
+    margin: 56px auto 0; max-width: 720px; text-align: left;
+    background: #0d1117; border: 1px solid var(--line); border-radius: 12px;
+    font-family: var(--mono); font-size: 14px; overflow: hidden;
+  }
+  .term .bar { background: var(--bg-soft); padding: 9px 14px; border-bottom: 1px solid var(--line); }
+  .term .bar i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 7px; }
+  .term .body { padding: 18px 20px; line-height: 1.8; white-space: pre; overflow-x: auto; }
+  .p  { color: var(--accent); }
+  .c  { color: var(--muted); }
+  .g  { color: var(--accent); }
+  .b  { color: var(--accent-2); }
+
+  section { padding: 72px 0; border-top: 1px solid var(--line); }
+  section h2 { font-size: 30px; letter-spacing: -0.01em; margin-bottom: 12px; }
+  section p.lead { color: var(--muted); max-width: 700px; margin-bottom: 40px; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    padding: 26px;
+  }
+  .card .num { font-family: var(--mono); color: var(--accent); font-size: 13px; margin-bottom: 10px; }
+  .card h3 { font-size: 19px; margin-bottom: 10px; }
+  .card p { color: var(--muted); font-size: 15px; }
+  .card code { font-family: var(--mono); font-size: 13px; color: var(--accent-2); }
+
+  pre.shell {
+    background: #0d1117; border: 1px solid var(--line); border-radius: 12px;
+    padding: 20px 22px; font-family: var(--mono); font-size: 14.5px; line-height: 1.9;
+    overflow-x: auto; margin: 18px 0;
+  }
+  pre.shell .c { color: var(--muted); }
+  pre.shell .p { color: var(--accent); user-select: none; }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 18px; font-size: 15px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; }
+  td:first-child { font-family: var(--mono); color: var(--accent-2); white-space: nowrap; }
+
+  .papers .card a { font-weight: 600; }
+  .papers .card .meta { font-size: 13px; color: var(--muted); margin-top: 6px; font-family: var(--mono); }
+
+  footer { padding: 48px 0 64px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; text-align: center; }
+  footer .logo { font-size: 16px; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <nav>
+    <div class="logo">crick<span>⛓</span></div>
+    <div class="links">
+      <a href="#how">How it works</a>
+      <a href="#install">Install</a>
+      <a href="#quickstart">Quickstart</a>
+      <a href="#papers">Papers</a>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <h1>Proof of work that's<br><em>worth the work</em></h1>
+    <p class="tag">crick is a Bitcoin-style blockchain where miners earn a difficulty
+    discount for publishing improved solutions to NP-complete problems —
+    turning wasted hash power into scientific computation.</p>
+    <div class="cta">
+      <a class="btn primary" href="#install">Get started</a>
+      <a class="btn ghost" href="#papers">Read the papers</a>
+    </div>
+
+    <div class="term">
+      <div class="bar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></div>
+      <div class="body"><span class="p">$</span> crick mine
+<span class="c">Mining to crk10d8a2…852c62 (solver on). Ctrl-C to stop.</span>
+#    1  <span class="g">solution k=8</span>  d=     500.0  001acf14e86b3c15…  balance=50
+#    2  classical     d=    1000.0  000ae7b1fe3b7314…  balance=100
+#    3  <span class="g">solution k=9</span>  d=     500.0  0007c2a91d44eb02…  balance=150
+<span class="p">$</span> crick solution
+<span class="c">puzzle      :</span> max-clique, G(n=120, p=0.5)
+<span class="c">best clique :</span> <span class="b">k=9</span>  <span class="c">verified: True</span></div>
+    </div>
+  </header>
+
+  <section id="how">
+    <h2>How it works</h2>
+    <p class="lead">Standard proof of work burns energy on hashes that mean nothing
+    outside the chain. crick keeps Bitcoin's security model but adds one rule that
+    makes solving real problems the rational mining strategy.</p>
+    <div class="cards">
+      <div class="card">
+        <div class="num">01 · TWO WAYS TO MINE</div>
+        <h3>Solve, or hash</h3>
+        <p>Every block can be mined classically at the base difficulty
+        <code>d_b</code>, or — if it carries a <em>strictly better</em> solution to the
+        network's puzzle — at a reduced difficulty <code>d_r &lt; d_b</code>.
+        Improving the solution is cheaper than out-hashing the network.</p>
+      </div>
+      <div class="card">
+        <div class="num">02 · DIPS v2 RETARGETING</div>
+        <h3>Independent difficulties</h3>
+        <p>Each difficulty retargets from its own block type: <code>d_b</code> holds
+        classical production steady, <code>d_r</code> holds solution production steady.
+        When a full window passes with no solution found, <code>d_r</code> drops 4× —
+        the harder the problem gets, the deeper the discount for solving it.</p>
+      </div>
+      <div class="card">
+        <div class="num">03 · USEFUL OUTPUT</div>
+        <h3>Science on the ledger</h3>
+        <p>The chain becomes a public, append-only record of ever-improving
+        biological solutions. Ships with two seed problems: <strong>protein
+        docking</strong> (lowest-energy ligand poses, scored by a fixed integer
+        energy function) and <strong>maximum common subgraph</strong> of protein
+        contact graphs (shared structural motifs). Instances are drawn from
+        billions × billions of structures — so vast that precomputing them
+        <em>is</em> the science.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="install">
+    <h2>Install</h2>
+    <p class="lead">crick is a single Python package with one small dependency.
+    Python 3.9+ required.</p>
+<pre class="shell"><span class="c"># from source</span>
+<span class="p">$</span> git clone https://github.com/OliverLaboratory/crick.git && cd crick
+<span class="p">$</span> pip install .
+
+<span class="c"># or, isolated install with pipx</span>
+<span class="p">$</span> pipx install git+https://github.com/OliverLaboratory/crick.git</pre>
+    <p style="color:var(--muted); font-size:15px">That's it — the <code style="font-family:var(--mono); color:var(--accent-2)">crick</code> command is now on your PATH.</p>
+  </section>
+
+  <section id="quickstart">
+    <h2>Quickstart</h2>
+    <p class="lead">Create a wallet and genesis block, then start mining — solo or
+    against the network.</p>
+<pre class="shell"><span class="p">$</span> crick init                  <span class="c"># wallet + genesis block in ~/.crick</span>
+<span class="p">$</span> crick mine                  <span class="c"># mine solo: solver + hasher in one loop</span>
+<span class="p">$</span> crick node --mine \
+        --peer http://seed.example:9911   <span class="c"># join a network and mine</span>
+<span class="p">$</span> crick status                <span class="c"># chain height, difficulties, balance</span>
+<span class="p">$</span> crick solution              <span class="c"># the best on-chain solution so far</span>
+<span class="p">$</span> crick send --to crk1… --amount 5   <span class="c"># spend your rewards</span></pre>
+    <table>
+      <tr><th>Command</th><th>What it does</th></tr>
+      <tr><td>crick init</td><td>Create a wallet and the genesis block (stores the puzzle instance)</td></tr>
+      <tr><td>crick mine</td><td>Mine solo — alternates puzzle solving with nonce search</td></tr>
+      <tr><td>crick node</td><td>Run a full node: HTTP API, peer gossip, optional mining</td></tr>
+      <tr><td>crick status</td><td>Height, total work, d_b, d_r, best clique, balance</td></tr>
+      <tr><td>crick solution</td><td>Show and verify the best solution recorded on-chain</td></tr>
+      <tr><td>crick send</td><td>Sign and broadcast a transaction via a running node</td></tr>
+    </table>
+  </section>
+
+  <section id="papers" class="papers">
+    <h2>The papers</h2>
+    <p class="lead">crick implements the protocol proposed and refined in two papers.
+    Where they differ, the 2019 difficulty-scaling scheme (DIPS) is authoritative.</p>
+    <div class="cards">
+      <div class="card">
+        <a href="https://arxiv.org/abs/1708.09419">Proposal for a fully decentralized blockchain and proof-of-work algorithm for solving NP-complete problems</a>
+        <div class="meta">Oliver, Ricottone, Philippopoulos · 2017 · arXiv:1708.09419</div>
+      </div>
+      <div class="card">
+        <a href="https://arxiv.org/abs/1911.00435">Difficulty Scaling in Proof of Work for Decentralized Problem Solving (DIPS)</a>
+        <div class="meta">Philippopoulos, Ricottone, Oliver · 2019 · arXiv:1911.00435</div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="logo">crick<span style="color:var(--accent)">⛓</span></div>
+    <p>An open research prototype. Not a financial instrument — a science experiment.</p>
+  </footer>
+</div>
+
+</body>
+</html>
