@@ -64,6 +64,13 @@ DIPS describes two update schemes. **v2, "independent updates" (Sec. 2.2), is im
 
 (The 2017 paper / DIPS v1 "single update" scheme — joint retargeting that enforces `⟨d_r/d_b⟩ = η` — is documented in the papers but intentionally not used: under v1, `d_r` rises with `d_b` even when no solutions are found, choking the incentive.)
 
+### Epochs / problem rotation (multi-puzzle, 2017 §III)
+
+The genesis block defines a **corpus** (`{type, seed, corpus_size}`), not a single instance. The chain optimizes one instance per **epoch**; when it **saturates** (`SATURATION_WINDOW` consecutive blocks with no improvement) it rotates to the next instance, index = `int(rotating_block_hash) % CORPUS_SIZE`. This is deliberately **unpredictable** (no pre-computing the corpus) and **unchooseable** (miners can't cherry-pick the easiest fresh instance). Key invariants in `chain.py`:
+- **`d_b` is global and continuous** across epochs (network security / hashrate). **`d_r` resets** to `d_b·η` on each rotation — so a fresh, easily-improved instance can't be farmed for cheap discounted blocks before `d_r` re-adapts. This split is the fix for "a new instance is always easier to improve."
+- **Per-instance bests persist** (`instance_best[index]`): revisiting an instance must beat its recorded history, not start from zero.
+- All epoch state (active instance, bests, counters, difficulties) is a pure function of the block sequence + params, so replay via `from_block_dicts` reconstructs it exactly. Tests force rotation by mining `SATURATION_WINDOW` classical blocks; keep `SATURATION_WINDOW` above any consecutive-classical run in other tests (the `fast_consensus` fixture sets it to 16).
+
 ### Multiple-puzzle extension (Section III of the 2017 paper — later phase)
 
 A single fixed `P` exhausts its usefulness quickly. The intended end state solves a set `Ω` of problem instances:

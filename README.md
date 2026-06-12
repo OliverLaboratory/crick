@@ -35,9 +35,27 @@ first at an ever-cheaper `d_r`. The solution window is kept small so rapid-fire
 solutions drive `d_r` back up quickly (the paper's defense against the "Bubka"
 hoarding attack).
 
+### Epochs: one problem at a time, then rotate
+
+The genesis block defines a **corpus** of instances (a problem type + seed), not a
+single puzzle. The chain optimizes **one instance per epoch**; when that instance
+**saturates** (a window of blocks finds no further improvement) it rotates to the
+next, whose index comes from the hash of the rotating block — *unpredictable* (you
+can't pre-compute the corpus) and *unchooseable* (miners can't cherry-pick the
+easiest fresh instance). This is why a problem is held for an epoch rather than
+switched every block: an instance needs many blocks to be optimized to depth.
+
+Two difficulties play different roles across epochs: **`d_b` is global and
+continuous** (it tracks network hashrate / security), while **`d_r` resets each
+epoch** to `d_b·η`. The reset is deliberate — a fresh instance is trivially
+improvable, so without it miners could farm cheap discounted blocks; resetting `d_r`
+makes the discount re-earn itself as the new instance hardens. Per-instance bests
+persist, so revisiting an instance must beat its recorded history.
+
 ### Seed problems
 
-A network is seeded with one problem (`crick init --problem <type>`). All share
+A network is seeded with one problem **type** (`crick init --problem <type>`); the
+chain then works through a corpus of its instances, epoch by epoch. All types share
 the same protocol; they differ only in the (cheap, exact, integer) verifier:
 
 - **`docking`** (default) — given a protein and a ligand, find a ligand *pose*

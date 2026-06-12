@@ -1,25 +1,26 @@
-"""The blockchain: validation, state, and dual-difficulty retargeting.
+"""The blockchain: validation, state, dual-difficulty retargeting, and epochs.
 
-The consensus-critical departure from Bitcoin: two difficulties. A block is
-valid at the reduced difficulty d_r if and only if it carries a puzzle
-solution strictly better than the best one recorded on its branch;
-otherwise the base difficulty d_b applies.
+Two departures from Bitcoin:
 
-Difficulty updates follow DIPS protocol v2, "independent updates"
-(arXiv:1911.00435, Sec. 2.2):
+1. Dual difficulty. A block is valid at the reduced difficulty d_r iff it
+   carries a puzzle solution strictly better than the best recorded for the
+   *active* instance; otherwise the base difficulty d_b applies. Difficulties
+   follow DIPS v2 "independent updates" (arXiv:1911.00435, Sec. 2.2): d_b
+   retargets from classical-block timing, d_r from solution-block timing, and a
+   drought (a window of classical blocks with no solution) cuts d_r.
 
-- After every CLASSICAL_WINDOW *classical* blocks, d_b is retargeted so the
-  network keeps producing classical blocks every CLASSICAL_BLOCK_TIME seconds.
-- After every SOLUTION_WINDOW *solution* blocks, d_r is retargeted so
-  solution blocks keep arriving every SOLUTION_BLOCK_TIME seconds.
-- Drought rule: if CLASSICAL_WINDOW *consecutive* classical blocks arrive
-  (no solution found), d_r is cut by MAX_RETARGET_FACTOR. As the problem
-  hardens, the discount deepens — and hoarding a solution risks someone
-  else publishing first at an ever-cheaper d_r.
+2. Epochs / problem rotation (the multi-puzzle scheme, 2017 Sec. III). The
+   genesis block defines a corpus (problem type + seed + size), not a single
+   instance. The chain works one instance at a time; when that instance
+   saturates (SATURATION_WINDOW consecutive blocks find no improvement) it
+   rotates to the next, whose index is `int(rotating_block_hash) % CORPUS_SIZE`
+   — unpredictable until the block is mined, and not chooseable by miners.
+   Per-instance bests persist (revisiting an instance must beat its history),
+   and d_r resets each epoch (d_b, the global security difficulty, does not).
 
-Every update is clamped to a factor of MAX_RETARGET_FACTOR (paper eq. 2).
-All schedule state (counters, window anchors) is derived purely from block
-data, so any node replaying the chain arrives at the same difficulties.
+All epoch state is a pure function of the block sequence and params, so any
+node replaying the chain reconstructs identical difficulties, the active
+instance, and every per-instance best.
 """
 
 import json
@@ -29,7 +30,7 @@ from typing import Any, Dict, List, Optional
 from . import bioproblems  # noqa: F401 -- registers mcs-protein and docking
 from . import params
 from .block import Block, now
-from .puzzle import Problem, new_problem, problem_from_spec
+from .puzzle import Problem, new_problem
 
 
 class ValidationError(Exception):
@@ -49,21 +50,28 @@ def _clamp(value: float, lo: float, hi: float) -> float:
 
 
 class Blockchain:
-    def __init__(self, problem: Problem):
-        self.problem = problem
+    def __init__(self, problem_type: str, network_seed: str, corpus_size: int):
+        self.problem_type = problem_type
+        self.network_seed = network_seed
+        self.corpus_size = corpus_size
         self.blocks: List[Block] = []
         self.balances: Dict[str, float] = {}
         self.nonces: Dict[str, int] = {}
         self.d_b: float = params.INITIAL_DIFFICULTY
         self.d_r: float = round(params.INITIAL_DIFFICULTY * params.INITIAL_ETA, 6)
-        self.best_solution: Any = None
-        # DIPS v2 schedule state, replayed deterministically from block data.
-        # Anchors are the timestamps the current windows started at; they are
-        # set from the first post-genesis block so the (possibly old) genesis
-        # timestamp never distorts the first measurement.
-        self._classical_in_window = 0
-        self._solutions_in_window = 0
-        self._consecutive_classical = 0
+
+        # epoch state (set when genesis is appended, updated on rotation)
+        self.problem: Optional[Problem] = None   # the ACTIVE instance
+        self.epoch_index: Optional[int] = None    # its index in the corpus
+        self.best_solution: Any = None            # best for the active instance
+        self.instance_best: Dict[int, Any] = {}   # index -> best solution (persisted)
+        self.epoch_start_height: int = 0
+
+        # difficulty / retarget counters
+        self._classical_in_window = 0    # toward the next d_b retarget
+        self._solutions_in_window = 0    # toward the next d_r retarget
+        self._consecutive_classical = 0  # toward the next drought d_r cut
+        self._dry_streak = 0             # blocks since the last improvement (rotation)
         self._anchor_b: Optional[float] = None
         self._anchor_r: Optional[float] = None
 
@@ -71,16 +79,20 @@ class Blockchain:
 
     @classmethod
     def create(cls, network_seed: str = params.NETWORK_SEED,
-               problem_type: Optional[str] = None) -> "Blockchain":
-        problem = new_problem(problem_type or params.DEFAULT_PROBLEM, network_seed)
-        chain = cls(problem)
+               problem_type: Optional[str] = None,
+               corpus_size: Optional[int] = None) -> "Blockchain":
+        problem_type = problem_type or params.DEFAULT_PROBLEM
+        corpus_size = corpus_size or params.CORPUS_SIZE
+        # validate the type early by generating a throwaway instance
+        new_problem(problem_type, f"{network_seed}:probe")
+        chain = cls(problem_type, network_seed, corpus_size)
         genesis = Block(
             height=0,
             prev_hash=params.GENESIS_PREV_HASH,
             timestamp=params.GENESIS_TIMESTAMP,
             miner="genesis",
             difficulty=0.0,
-            problem=problem.spec(),
+            problem={"type": problem_type, "seed": network_seed, "corpus_size": corpus_size},
         )
         chain._append(genesis)
         return chain
@@ -91,9 +103,11 @@ class Blockchain:
         if not block_dicts:
             raise ValidationError("empty chain")
         genesis = Block.from_dict(block_dicts[0])
-        if genesis.problem is None:
-            raise ValidationError("genesis missing problem spec")
-        chain = cls(problem_from_spec(genesis.problem))
+        spec = genesis.problem
+        if not spec or "type" not in spec or "seed" not in spec:
+            raise ValidationError("genesis missing corpus spec")
+        chain = cls(spec["type"], spec["seed"],
+                    int(spec.get("corpus_size", params.CORPUS_SIZE)))
         chain._append(genesis)
         for d in block_dicts[1:]:
             chain.add_block(Block.from_dict(d))
@@ -121,6 +135,34 @@ class Blockchain:
 
     def next_difficulty(self, with_solution: bool) -> float:
         return self.d_r if with_solution else self.d_b
+
+    # --------------------------------------------------------- epoch / corpus
+
+    def _index_from(self, block_hash: str) -> int:
+        return int(block_hash, 16) % self.corpus_size
+
+    def _instance(self, index: int) -> Problem:
+        return new_problem(self.problem_type, f"{self.network_seed}:i:{index}")
+
+    def _activate_epoch(self, index: int) -> None:
+        """Make instance `index` the active problem. Restores its persisted best
+        (None if never visited) and resets the per-problem difficulty d_r so a
+        fresh instance can't be farmed for cheap discounted blocks."""
+        self.epoch_index = index
+        self.problem = self._instance(index)
+        self.best_solution = self.instance_best.get(index)
+        self.epoch_start_height = self.height
+        self.d_r = round(max(self.d_b * params.INITIAL_ETA,
+                             params.MIN_REDUCED_DIFFICULTY), 6)
+        self._dry_streak = 0
+        self._solutions_in_window = 0
+        self._consecutive_classical = 0
+        self._anchor_r = self.tip.timestamp
+
+    def _maybe_rotate(self, block: Block) -> None:
+        epoch_len = self.height - self.epoch_start_height
+        if self._dry_streak >= params.SATURATION_WINDOW or epoch_len >= params.MAX_EPOCH:
+            self._activate_epoch(self._index_from(block.hash))
 
     # ------------------------------------------------------------- validation
 
@@ -188,11 +230,17 @@ class Blockchain:
             if not tx.is_coinbase:
                 self.balances[tx.sender] -= tx.amount
                 self.nonces[tx.sender] = self.nonces.get(tx.sender, 0) + 1
+        self.blocks.append(block)
+
+        if block.height == 0:
+            self._activate_epoch(self._index_from(block.hash))
+            return
+
         if block.has_solution:
             self.best_solution = block.solution
-        self.blocks.append(block)
-        if block.height > 0:
-            self._update_schedule(block)
+            self.instance_best[self.epoch_index] = block.solution
+        self._update_schedule(block)
+        self._maybe_rotate(block)
 
     # -------------------------------------------------- DIPS v2 retargeting
 
@@ -201,11 +249,13 @@ class Blockchain:
             self._anchor_b = self._anchor_r = block.timestamp
 
         if block.has_solution:
+            self._dry_streak = 0
             self._consecutive_classical = 0
             self._solutions_in_window += 1
             if self._solutions_in_window >= params.SOLUTION_WINDOW:
                 self._retarget_dr(block.timestamp)
         else:
+            self._dry_streak += 1
             self._classical_in_window += 1
             self._consecutive_classical += 1
             if self._classical_in_window >= params.CLASSICAL_WINDOW:
@@ -214,7 +264,7 @@ class Blockchain:
                 self._drought_discount()
 
     def _retarget_db(self, timestamp: float) -> None:
-        """Hold classical block production at CLASSICAL_BLOCK_TIME."""
+        """Hold classical block production at CLASSICAL_BLOCK_TIME (global)."""
         elapsed = max(timestamp - self._anchor_b, 0.001)
         t_star = elapsed / params.CLASSICAL_WINDOW
         x = params.MAX_RETARGET_FACTOR
@@ -225,7 +275,8 @@ class Blockchain:
         self._anchor_b = timestamp
 
     def _retarget_dr(self, timestamp: float) -> None:
-        """Hold solution block production at SOLUTION_BLOCK_TIME."""
+        """Hold solution block production at SOLUTION_BLOCK_TIME (per epoch).
+        If a fresh instance yields easy solutions, this drives d_r back up."""
         elapsed = max(timestamp - self._anchor_r, 0.001)
         t_star = elapsed / params.SOLUTION_WINDOW
         x = params.MAX_RETARGET_FACTOR
@@ -236,8 +287,8 @@ class Blockchain:
         self._anchor_r = timestamp
 
     def _drought_discount(self) -> None:
-        """v2: a full classical window with no solution cuts d_r by the max
-        factor, deepening the solving incentive as the problem hardens."""
+        """A full classical window with no solution cuts d_r by the max factor —
+        deepening the incentive as the active instance hardens."""
         self.d_r = round(max(self.d_r / params.MAX_RETARGET_FACTOR,
                              params.MIN_REDUCED_DIFFICULTY), 6)
         self._consecutive_classical = 0

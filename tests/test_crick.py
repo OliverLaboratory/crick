@@ -16,6 +16,7 @@ def fast_consensus(monkeypatch):
     monkeypatch.setattr(params, "GRAPH_N", 30)
     monkeypatch.setattr(params, "CLASSICAL_WINDOW", 6)
     monkeypatch.setattr(params, "SOLUTION_WINDOW", 2)
+    monkeypatch.setattr(params, "SATURATION_WINDOW", 16)
     monkeypatch.setattr(params, "PROTEIN_RESIDUES", 14)
     monkeypatch.setattr(params, "PROTEIN_ATOMS", 20)
     monkeypatch.setattr(params, "LIGAND_ATOMS", 4)
@@ -301,4 +302,64 @@ def test_chain_runs_on_each_problem(wallet):
         # full re-validation from serialized form reproduces the tip
         restored = Blockchain.from_block_dicts([b.to_dict() for b in chain.blocks])
         assert restored.tip.hash == chain.tip.hash
+
+
+# ------------------------------------------------------- epochs / rotation
+
+def test_problem_rotates_on_saturation(chain, wallet):
+    start_index = chain.epoch_index
+    # mine the genesis solution first so the active instance is "in progress"
+    chain.add_block(mine_block(chain, wallet, solve=True))
+    assert chain.epoch_index == start_index
+    # a full saturation window with no improvement rotates to a new instance
+    for _ in range(params.SATURATION_WINDOW):
+        chain.add_block(mine_block(chain, wallet, solve=False))
+    assert chain.epoch_index != start_index           # rotated
+    assert chain.best_solution is None                # fresh instance, nothing yet
+    assert chain.epoch_start_height == chain.height    # epoch just began
+
+
+def test_fresh_epoch_resets_dr(chain, wallet):
+    for _ in range(params.SATURATION_WINDOW):
+        chain.add_block(mine_block(chain, wallet, solve=False))
+    # on rotation d_r is reset toward d_b (not left at the drought-cut value),
+    # so a fresh, easily-improved instance can't be farmed at a deep discount
+    expected = round(max(chain.d_b * params.INITIAL_ETA, params.MIN_REDUCED_DIFFICULTY), 6)
+    assert chain.d_r == pytest.approx(expected)
+
+
+def test_db_is_global_dr_is_per_epoch(chain, wallet):
+    # d_b retargets from classical timing regardless of rotation; mining a full
+    # saturation window (all classical) pushes d_b up and survives the rotation
+    d_b_before = chain.d_b
+    for _ in range(params.SATURATION_WINDOW):
+        chain.add_block(mine_block(chain, wallet, solve=False))
+    assert chain.d_b > d_b_before
+
+
+def test_per_instance_best_persists_on_revisit(monkeypatch, wallet):
+    # corpus of size 1: every rotation returns to the same instance, so its best
+    # must persist — a revisited instance is not a fresh start
+    monkeypatch.setattr(params, "CORPUS_SIZE", 1)
+    chain = Blockchain.create("revisit", problem_type="max-clique")
+    chain.add_block(mine_block(chain, wallet, solve=True))
+    best_before = chain.best_score
+    assert best_before > 0
+    for _ in range(params.SATURATION_WINDOW):
+        chain.add_block(mine_block(chain, wallet, solve=False))
+    assert chain.epoch_index == 0                      # same instance
+    assert chain.best_score == best_before             # best persisted, not reset
+
+
+def test_epoch_rotation_deterministic_on_replay(chain, wallet):
+    chain.add_block(mine_block(chain, wallet, solve=True))
+    for _ in range(params.SATURATION_WINDOW):          # force a rotation
+        chain.add_block(mine_block(chain, wallet, solve=False))
+    chain.add_block(mine_block(chain, wallet, solve=True))  # solve the new instance
+    restored = Blockchain.from_block_dicts([b.to_dict() for b in chain.blocks])
+    assert restored.tip.hash == chain.tip.hash
+    assert restored.epoch_index == chain.epoch_index
+    assert restored.best_score == chain.best_score
+    assert restored.d_b == chain.d_b and restored.d_r == chain.d_r
+    assert restored.instance_best.keys() == chain.instance_best.keys()
 

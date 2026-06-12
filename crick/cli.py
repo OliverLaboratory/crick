@@ -60,6 +60,8 @@ def cmd_status(args) -> None:
     print(f"total work   : {chain.total_work():.0f}")
     print(f"d_b (base)   : {chain.d_b:.1f}")
     print(f"d_r (reduced): {chain.d_r:.1f}  (eta = {chain.d_r / chain.d_b:.2f})")
+    print(f"epoch        : instance #{chain.epoch_index} of {chain.corpus_size} "
+          f"(since block {chain.epoch_start_height}; {len(chain.instance_best)} solved so far)")
     print(f"puzzle       : {chain.problem.describe()}")
     print(f"best solution: {chain.problem.summary(chain.best_solution)}")
     print(f"address      : {wallet.address}")

@@ -218,15 +218,22 @@
         the harder the problem gets, the deeper the discount for solving it.</p>
       </div>
       <div class="card">
-        <div class="num">03 · USEFUL OUTPUT</div>
+        <div class="num">03 · EPOCHS</div>
+        <h3>One instance at a time, then rotate</h3>
+        <p>The chain optimizes one problem instance per <em>epoch</em>, then rotates
+        when it saturates. The next instance comes from the rotating block's hash —
+        unpredictable (no precomputing the corpus) and unchooseable (no
+        cherry-picking the easiest one). <code>d_b</code> stays global;
+        <code>d_r</code> resets each epoch so a fresh instance can't be farmed for
+        cheap discounted blocks.</p>
+      </div>
+      <div class="card">
+        <div class="num">04 · USEFUL OUTPUT</div>
         <h3>Science on the ledger</h3>
         <p>The chain becomes a public, append-only record of ever-improving
-        biological solutions. Ships with two seed problems: <strong>protein
-        docking</strong> (lowest-energy ligand poses, scored by a fixed integer
-        energy function) and <strong>maximum common subgraph</strong> of protein
-        contact graphs (shared structural motifs). Instances are drawn from
-        billions × billions of structures — so vast that precomputing them
-        <em>is</em> the science.</p>
+        biological solutions — lowest-energy ligand poses, shared structural
+        motifs — drawn from billions × billions of structures, so vast that
+        precomputing them <em>is</em> the science.</p>
       </div>
     </div>
 
@@ -311,7 +318,8 @@
 
   <section id="problems">
     <h2>Problems you can solve</h2>
-    <p class="lead">A network is seeded with one problem at genesis. Every problem shares the
+    <p class="lead">A network is seeded with one problem <em>type</em> at genesis and then works
+    through a corpus of its instances, one per epoch (see above). Every type shares the
     same protocol and differs only in its (cheap, exact, integer) verifier — so "is this a
     real improvement?" is always an unambiguous comparison. Choose one with
     <code style="font-family:var(--mono);color:var(--accent-2)">crick init --problem</code>.</p>
@@ -345,9 +353,9 @@
 
     <div class="prob-fork">
       <h3>Propose a new problem — forking</h3>
-      <p class="lead">A problem's best score eventually saturates: once no one can improve it,
-      the network has squeezed out its useful work and drifts back toward plain hashing. To keep
-      doing science, the community introduces a fresh problem — a deliberate fork. Two steps:</p>
+      <p class="lead">Rotating to the next <em>instance</em> of the same problem type happens
+      automatically each epoch. Introducing a whole new <em>kind</em> of problem — a new
+      verifier — is a deliberate fork the community opts into. Two steps:</p>
 <pre class="shell"><span class="c"># 1. implement the verifier. it must be cheap, exact, and deterministic,</span>
 <span class="c">#    with an integer score where higher is strictly better.</span>
 <span class="p">@register_problem</span>

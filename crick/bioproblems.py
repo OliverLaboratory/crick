@@ -178,6 +178,10 @@ class DockingProblem(Problem):
         self.ligand = [(int(x), int(y), int(z), int(t)) for x, y, z, t in ligand_atoms]
         self.box_lo = tuple(int(c) for c in box[0])
         self.box_hi = tuple(int(c) for c in box[1])
+        # max coordinate magnitude of any ligand atom; a rotation can map it onto
+        # any axis, so insetting translations by this keeps the ligand in-box.
+        self.ligand_radius = max((max(abs(a[0]), abs(a[1]), abs(a[2]))
+                                  for a in self.ligand), default=0)
 
     # -- consensus path (cheap, exact, integer) --
 
@@ -236,8 +240,10 @@ class DockingProblem(Problem):
         best_energy = None if best_placed is None else self._energy(best_placed)
         champion, champion_energy = None, best_energy
         restarts = max(1, attempts // 20)
+        r = self.ligand_radius
         for _ in range(restarts):
-            pose = {"t": [rng.randint(self.box_lo[d], self.box_hi[d]) for d in range(3)],
+            pose = {"t": [rng.randint(min(self.box_lo[d] + r, self.box_hi[d] - r),
+                                      self.box_hi[d] - r) for d in range(3)],
                     "rot": rng.randrange(len(ROTATIONS))}
             placed = self._place(pose)
             energy = self._energy(placed) if (placed is not None and self.verify(pose)) else None
