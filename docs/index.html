@@ -101,6 +101,18 @@
   .papers .card a { font-weight: 600; }
   .papers .card .meta { font-size: 13px; color: var(--muted); margin-top: 6px; font-family: var(--mono); }
 
+  figure.diagram { margin: 44px 0 0; }
+  figure.diagram svg { width: 100%; height: auto; display: block; }
+  figure.diagram figcaption { color: var(--muted); font-size: 14px; margin-top: 14px; text-align: center; }
+  .diag-legend { display: flex; gap: 28px; justify-content: center; flex-wrap: wrap; margin-top: 18px; font-size: 14px; color: var(--muted); }
+  .diag-legend span { display: inline-flex; align-items: center; gap: 9px; }
+  .diag-legend i { width: 15px; height: 15px; border-radius: 4px; display: inline-block; border: 1px solid; }
+
+  .prob-fork { margin-top: 40px; }
+  .prob-fork h3 { font-size: 21px; margin-bottom: 10px; }
+  .prob-fork p.lead { margin-bottom: 18px; }
+  .card .cmd { font-family: var(--mono); font-size: 13px; color: var(--accent); margin-top: 14px; display: block; }
+
   footer { padding: 48px 0 64px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; text-align: center; }
   footer .logo { font-size: 16px; margin-bottom: 8px; }
 </style>
@@ -112,6 +124,7 @@
     <div class="logo">crick<span>⛓</span></div>
     <div class="links">
       <a href="#how">How it works</a>
+      <a href="#problems">Problems</a>
       <a href="#install">Install</a>
       <a href="#quickstart">Quickstart</a>
       <a href="#papers">Papers</a>
@@ -174,6 +187,139 @@
         billions × billions of structures — so vast that precomputing them
         <em>is</em> the science.</p>
       </div>
+    </div>
+
+    <figure class="diagram">
+      <svg viewBox="0 0 768 150" role="img" aria-label="A blockchain where some blocks carry solutions and others do not">
+        <!-- chain links: each block points to its parent -->
+        <g stroke="#6b7689" stroke-width="2">
+          <line x1="144" y1="76" x2="91" y2="76"/><line x1="240" y1="76" x2="187" y2="76"/>
+          <line x1="336" y1="76" x2="283" y2="76"/><line x1="432" y1="76" x2="379" y2="76"/>
+          <line x1="528" y1="76" x2="475" y2="76"/><line x1="624" y1="76" x2="571" y2="76"/>
+          <line x1="720" y1="76" x2="667" y2="76"/>
+        </g>
+        <g fill="#6b7689">
+          <polygon points="84,76 91,72 91,80"/><polygon points="180,76 187,72 187,80"/>
+          <polygon points="276,76 283,72 283,80"/><polygon points="372,76 379,72 379,80"/>
+          <polygon points="468,76 475,72 475,80"/><polygon points="564,76 571,72 571,80"/>
+          <polygon points="660,76 667,72 667,80"/>
+        </g>
+        <!-- genesis -->
+        <rect x="12" y="40" width="72" height="72" rx="9" fill="#14233d" stroke="#6ea8fe" stroke-width="1.5"/>
+        <text x="48" y="80" text-anchor="middle" fill="#6ea8fe" font-size="24" font-weight="700" font-family="ui-monospace,monospace">&#937;</text>
+        <text x="48" y="100" text-anchor="middle" fill="#6ea8fe" font-size="10" font-family="ui-monospace,monospace">problem</text>
+        <text x="48" y="132" text-anchor="middle" fill="#8b94a7" font-size="12" font-family="ui-monospace,monospace">#0</text>
+        <!-- block template repeated; s = solution (green), c = classical (grey) -->
+        <!-- #1 solution -->
+        <rect x="108" y="40" width="72" height="72" rx="9" fill="#122a22" stroke="#4fd6a5" stroke-width="1.5"/>
+        <g transform="translate(144,66)" stroke="#4fd6a5" stroke-width="2" fill="#4fd6a5">
+          <line x1="-11" y1="8" x2="11" y2="4"/><line x1="11" y1="4" x2="0" y2="-7"/><line x1="0" y1="-7" x2="-11" y2="8"/>
+          <circle cx="-11" cy="8" r="4.5"/><circle cx="11" cy="4" r="4.5"/><circle cx="0" cy="-7" r="4.5"/>
+        </g>
+        <text x="144" y="100" text-anchor="middle" fill="#4fd6a5" font-size="11" font-family="ui-monospace,monospace">d_r</text>
+        <text x="144" y="132" text-anchor="middle" fill="#8b94a7" font-size="12" font-family="ui-monospace,monospace">#1</text>
+        <!-- #2 classical -->
+        <rect x="204" y="40" width="72" height="72" rx="9" fill="#161b27" stroke="#2e3a4f" stroke-width="1.5"/>
+        <g stroke="#8b94a7" stroke-width="2.5" opacity="0.55"><line x1="231" y1="58" x2="231" y2="84"/><line x1="240" y1="58" x2="240" y2="84"/><line x1="249" y1="58" x2="249" y2="84"/></g>
+        <text x="240" y="100" text-anchor="middle" fill="#8b94a7" font-size="11" font-family="ui-monospace,monospace">d_b</text>
+        <text x="240" y="132" text-anchor="middle" fill="#8b94a7" font-size="12" font-family="ui-monospace,monospace">#2</text>
+        <!-- #3 classical -->
+        <rect x="300" y="40" width="72" height="72" rx="9" fill="#161b27" stroke="#2e3a4f" stroke-width="1.5"/>
+        <g stroke="#8b94a7" stroke-width="2.5" opacity="0.55"><line x1="327" y1="58" x2="327" y2="84"/><line x1="336" y1="58" x2="336" y2="84"/><line x1="345" y1="58" x2="345" y2="84"/></g>
+        <text x="336" y="100" text-anchor="middle" fill="#8b94a7" font-size="11" font-family="ui-monospace,monospace">d_b</text>
+        <text x="336" y="132" text-anchor="middle" fill="#8b94a7" font-size="12" font-family="ui-monospace,monospace">#3</text>
+        <!-- #4 solution -->
+        <rect x="396" y="40" width="72" height="72" rx="9" fill="#122a22" stroke="#4fd6a5" stroke-width="1.5"/>
+        <g transform="translate(432,66)" stroke="#4fd6a5" stroke-width="2" fill="#4fd6a5">
+          <line x1="-11" y1="8" x2="11" y2="4"/><line x1="11" y1="4" x2="0" y2="-7"/><line x1="0" y1="-7" x2="-11" y2="8"/>
+          <circle cx="-11" cy="8" r="4.5"/><circle cx="11" cy="4" r="4.5"/><circle cx="0" cy="-7" r="4.5"/>
+        </g>
+        <text x="432" y="100" text-anchor="middle" fill="#4fd6a5" font-size="11" font-family="ui-monospace,monospace">d_r</text>
+        <text x="432" y="132" text-anchor="middle" fill="#8b94a7" font-size="12" font-family="ui-monospace,monospace">#4</text>
+        <!-- #5 classical -->
+        <rect x="492" y="40" width="72" height="72" rx="9" fill="#161b27" stroke="#2e3a4f" stroke-width="1.5"/>
+        <g stroke="#8b94a7" stroke-width="2.5" opacity="0.55"><line x1="519" y1="58" x2="519" y2="84"/><line x1="528" y1="58" x2="528" y2="84"/><line x1="537" y1="58" x2="537" y2="84"/></g>
+        <text x="528" y="100" text-anchor="middle" fill="#8b94a7" font-size="11" font-family="ui-monospace,monospace">d_b</text>
+        <text x="528" y="132" text-anchor="middle" fill="#8b94a7" font-size="12" font-family="ui-monospace,monospace">#5</text>
+        <!-- #6 solution -->
+        <rect x="588" y="40" width="72" height="72" rx="9" fill="#122a22" stroke="#4fd6a5" stroke-width="1.5"/>
+        <g transform="translate(624,66)" stroke="#4fd6a5" stroke-width="2" fill="#4fd6a5">
+          <line x1="-11" y1="8" x2="11" y2="4"/><line x1="11" y1="4" x2="0" y2="-7"/><line x1="0" y1="-7" x2="-11" y2="8"/>
+          <circle cx="-11" cy="8" r="4.5"/><circle cx="11" cy="4" r="4.5"/><circle cx="0" cy="-7" r="4.5"/>
+        </g>
+        <text x="624" y="100" text-anchor="middle" fill="#4fd6a5" font-size="11" font-family="ui-monospace,monospace">d_r</text>
+        <text x="624" y="132" text-anchor="middle" fill="#8b94a7" font-size="12" font-family="ui-monospace,monospace">#6</text>
+        <!-- #7 classical -->
+        <rect x="684" y="40" width="72" height="72" rx="9" fill="#161b27" stroke="#2e3a4f" stroke-width="1.5"/>
+        <g stroke="#8b94a7" stroke-width="2.5" opacity="0.55"><line x1="711" y1="58" x2="711" y2="84"/><line x1="720" y1="58" x2="720" y2="84"/><line x1="729" y1="58" x2="729" y2="84"/></g>
+        <text x="720" y="100" text-anchor="middle" fill="#8b94a7" font-size="11" font-family="ui-monospace,monospace">d_b</text>
+        <text x="720" y="132" text-anchor="middle" fill="#8b94a7" font-size="12" font-family="ui-monospace,monospace">#7</text>
+      </svg>
+      <figcaption>Each block links to its parent. Green blocks carry a strictly-better solution
+      and are accepted at the reduced difficulty <code>d_r</code>; grey blocks are ordinary
+      hash-only blocks at <code>d_b</code>. (After Fig. 1 of the 2019 paper.)</figcaption>
+      <div class="diag-legend">
+        <span><i style="background:#122a22;border-color:#4fd6a5"></i> solution block — reduced <code>d_r</code></span>
+        <span><i style="background:#161b27;border-color:#2e3a4f"></i> classical block — base <code>d_b</code></span>
+        <span><i style="background:#14233d;border-color:#6ea8fe"></i> genesis — stores the problem</span>
+      </div>
+    </figure>
+  </section>
+
+  <section id="problems">
+    <h2>Problems you can solve</h2>
+    <p class="lead">A network is seeded with one problem at genesis. Every problem shares the
+    same protocol and differs only in its (cheap, exact, integer) verifier — so "is this a
+    real improvement?" is always an unambiguous comparison. Choose one with
+    <code style="font-family:var(--mono);color:var(--accent-2)">crick init --problem</code>.</p>
+    <div class="cards">
+      <div class="card">
+        <div class="num">DOCKING · default</div>
+        <h3>Protein–ligand docking</h3>
+        <p>Find a ligand <em>pose</em> with lower energy than the best so far, scored by a
+        fixed integer energy function on a 3D lattice. Verifying a pose is one integer sum;
+        finding a good one means searching rotations × translations. Instances are drawn from
+        ESM Atlas × a ligand library (Enamine).</p>
+        <code class="cmd">crick init --problem docking</code>
+      </div>
+      <div class="card">
+        <div class="num">MCS-PROTEIN</div>
+        <h3>Maximum common subgraph</h3>
+        <p>The largest shared substructure between two protein contact graphs — exactly
+        max-clique on their modular product. A solution is a residue↔residue mapping; the
+        chain accumulates a public library of shared structural motifs.</p>
+        <code class="cmd">crick init --problem mcs-protein</code>
+      </div>
+      <div class="card">
+        <div class="num">MAX-CLIQUE</div>
+        <h3>Maximum clique</h3>
+        <p>The reference / benchmark problem: largest clique in a pseudorandom graph derived
+        from the network seed. Trivial exact verification, short improvement ladder — useful
+        for testing the protocol itself.</p>
+        <code class="cmd">crick init --problem max-clique</code>
+      </div>
+    </div>
+
+    <div class="prob-fork">
+      <h3>Propose a new problem — forking</h3>
+      <p class="lead">A problem's best score eventually saturates: once no one can improve it,
+      the network has squeezed out its useful work and drifts back toward plain hashing. To keep
+      doing science, the community introduces a fresh problem — a deliberate fork. Two steps:</p>
+<pre class="shell"><span class="c"># 1. implement the verifier. it must be cheap, exact, and deterministic,</span>
+<span class="c">#    with an integer score where higher is strictly better.</span>
+<span class="p">@register_problem</span>
+<span class="b">class</span> FoldingProblem(Problem):
+    type = <span class="g">"folding"</span>
+    def verify(self, solution): ...   <span class="c"># poly-time, deterministic</span>
+    def score(self, solution): ...    <span class="c"># integer; higher = better</span>
+    def improve(self, best): ...      <span class="c"># miner-side search</span>
+
+<span class="c"># 2. fork: agree off-chain, then launch a chain seeded with it</span>
+<span class="p">$</span> crick init --problem folding</pre>
+      <p style="color:var(--muted); font-size:15px">The papers also sketch an on-chain path: a
+      <em>stake-gated submission transaction</em> where the proposer burns tokens, so flooding the
+      network with junk or pre-solved problems is never profitable — keeping problem selection
+      decentralized without a central authority.</p>
     </div>
   </section>
 
