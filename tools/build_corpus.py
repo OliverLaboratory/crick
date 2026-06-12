@@ -45,14 +45,20 @@ def fetch_pdb(pdb_id: str) -> str:
 
 
 def contact_graph(pdb_text: str, max_res: int):
-    """C-alpha contact graph of the first chain, truncated to max_res residues."""
+    """C-alpha contact graph of the first chain of the first model, truncated to
+    max_res residues. Handles multi-model (NMR) entries and alternate locations."""
     cas = []
     seen_chain = None
     for line in pdb_text.splitlines():
+        if line.startswith("ENDMDL"):
+            break  # first model only (NMR structures have many)
         if not line.startswith("ATOM"):
             continue
         if line[12:16].strip() != "CA":
             continue
+        altloc = line[16]
+        if altloc not in (" ", "A"):
+            continue  # skip alternate conformations of the same atom
         chain = line[21]
         if seen_chain is None:
             seen_chain = chain
