@@ -363,3 +363,69 @@ def test_epoch_rotation_deterministic_on_replay(chain, wallet):
     assert restored.d_b == chain.d_b and restored.d_r == chain.d_r
     assert restored.instance_best.keys() == chain.instance_best.keys()
 
+
+# ----------------------------------------------------- real (manifest) corpus
+
+def _write_corpus(tmp_path, proteins):
+    """Write a content-addressed mcs-protein corpus to tmp_path; return file:// URL."""
+    import hashlib
+    from crick.crypto import canonical_json
+    (tmp_path / "proteins").mkdir()
+    entries = []
+    for name, size, edges in proteins:
+        blob = {"name": name, "size": size, "edges": edges}
+        rel = f"proteins/{name}.json"
+        (tmp_path / rel).write_text(canonical_json(blob))
+        sha = hashlib.sha256(canonical_json(blob).encode()).hexdigest()
+        entries.append({"name": name, "size": size, "sha256": sha, "file": rel})
+    manifest = {"type": "mcs-protein", "version": 1, "proteins": entries}
+    (tmp_path / "manifest.json").write_text(canonical_json(manifest))
+    return "file://" + str(tmp_path / "manifest.json")
+
+
+_DEMO_PROTEINS = [
+    ("P1", 6, [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [0, 3]]),
+    ("P2", 6, [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [1, 4]]),
+    ("P3", 5, [[0, 1], [1, 2], [2, 3], [3, 4], [0, 2]]),
+]
+
+
+def test_manifest_corpus_loads_and_verifies(tmp_path):
+    from crick.corpus import ManifestCorpus, manifest_corpus_from_url
+    url = _write_corpus(tmp_path, _DEMO_PROTEINS)
+    corpus = manifest_corpus_from_url(url)
+    assert corpus.problem_type == "mcs-protein"
+    assert corpus.size == 3 * 3
+    prob = corpus.instance(1)                       # pair (1, 0)
+    sol = prob.improve(None, attempts=200)
+    assert sol and prob.verify(sol)
+    # committing the wrong manifest hash is rejected
+    with pytest.raises(ValueError):
+        ManifestCorpus(url, "00" * 32)
+
+
+def test_manifest_corpus_rejects_tampered_blob(tmp_path):
+    from crick.corpus import manifest_corpus_from_url
+    url = _write_corpus(tmp_path, _DEMO_PROTEINS)
+    corpus = manifest_corpus_from_url(url)
+    # corrupt a blob on the "mirror" after the manifest hash was pinned
+    (tmp_path / "proteins" / "P1.json").write_text('{"name":"P1","size":6,"edges":[]}')
+    with pytest.raises(ValueError):
+        corpus.instance(0)                          # pair touching P1 -> hash mismatch
+
+
+def test_chain_on_real_manifest_corpus(tmp_path, wallet):
+    from crick.chain import Blockchain
+    url = _write_corpus(tmp_path, _DEMO_PROTEINS)
+    chain = Blockchain.create(manifest_url=url)
+    assert chain.corpus_size == 9
+    chain.add_block(mine_block(chain, wallet, solve=True))
+    assert chain.blocks[1].has_solution
+    assert chain.problem.verify(chain.best_solution)
+    # genesis commits only the manifest hash, not the data
+    assert "manifest_sha256" in chain.blocks[0].problem
+    assert "seed" not in chain.blocks[0].problem
+    # replay must re-fetch + hash-verify the corpus and reach the same tip
+    restored = Blockchain.from_block_dicts([b.to_dict() for b in chain.blocks])
+    assert restored.tip.hash == chain.tip.hash
+

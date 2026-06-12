@@ -43,10 +43,16 @@ def cmd_init(args) -> None:
     with open(wallet_path, "w") as f:
         json.dump({"private_key": wallet.private_key_hex, "address": wallet.address}, f)
     os.chmod(wallet_path, 0o600)
-    chain = Blockchain.create(args.seed, problem_type=args.problem)
+    chain = Blockchain.create(args.seed, problem_type=args.problem,
+                              manifest_url=args.manifest)
     chain.save(chain_path)
     print(f"Initialized crick node in {args.data_dir}")
-    print(f"  network seed : {args.seed}")
+    if args.manifest:
+        print(f"  corpus       : {args.manifest}")
+        print(f"                 ({len(chain.corpus.entries)} real proteins, "
+              f"{chain.corpus_size} MCS instances)")
+    else:
+        print(f"  network seed : {args.seed}")
     print(f"  puzzle       : {chain.problem.describe()}")
     print(f"  your address : {wallet.address}")
     print("Next: `crick mine` (solo) or `crick node --mine --peer <url>` (network).")
@@ -146,6 +152,9 @@ def main(argv=None) -> None:
     p.add_argument("--seed", default=params.NETWORK_SEED, help="network seed")
     p.add_argument("--problem", default=params.DEFAULT_PROBLEM, choices=available_problems(),
                    help=f"seed problem (default: {params.DEFAULT_PROBLEM})")
+    p.add_argument("--manifest", default=None,
+                   help="URL of a real-data corpus manifest (pins its hash in genesis); "
+                        "overrides --problem")
     p.add_argument("--force", action="store_true", help="overwrite an existing wallet")
     p.set_defaults(func=cmd_init)
 

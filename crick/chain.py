@@ -30,6 +30,8 @@ from typing import Any, Dict, List, Optional
 from . import bioproblems  # noqa: F401 -- registers mcs-protein and docking
 from . import params
 from .block import Block, now
+from .corpus import (SyntheticCorpus, corpus_from_genesis,
+                     manifest_corpus_from_url)
 from .puzzle import Problem, new_problem
 
 
@@ -50,10 +52,10 @@ def _clamp(value: float, lo: float, hi: float) -> float:
 
 
 class Blockchain:
-    def __init__(self, problem_type: str, network_seed: str, corpus_size: int):
-        self.problem_type = problem_type
-        self.network_seed = network_seed
-        self.corpus_size = corpus_size
+    def __init__(self, corpus):
+        self.corpus = corpus
+        self.problem_type = corpus.problem_type
+        self.corpus_size = corpus.size
         self.blocks: List[Block] = []
         self.balances: Dict[str, float] = {}
         self.nonces: Dict[str, int] = {}
@@ -80,19 +82,23 @@ class Blockchain:
     @classmethod
     def create(cls, network_seed: str = params.NETWORK_SEED,
                problem_type: Optional[str] = None,
-               corpus_size: Optional[int] = None) -> "Blockchain":
-        problem_type = problem_type or params.DEFAULT_PROBLEM
-        corpus_size = corpus_size or params.CORPUS_SIZE
-        # validate the type early by generating a throwaway instance
-        new_problem(problem_type, f"{network_seed}:probe")
-        chain = cls(problem_type, network_seed, corpus_size)
+               corpus_size: Optional[int] = None,
+               manifest_url: Optional[str] = None) -> "Blockchain":
+        if manifest_url:
+            corpus = manifest_corpus_from_url(manifest_url)  # real, content-addressed
+        else:
+            problem_type = problem_type or params.DEFAULT_PROBLEM
+            corpus_size = corpus_size or params.CORPUS_SIZE
+            new_problem(problem_type, f"{network_seed}:probe")  # validate the type
+            corpus = SyntheticCorpus(problem_type, network_seed, corpus_size)
+        chain = cls(corpus)
         genesis = Block(
             height=0,
             prev_hash=params.GENESIS_PREV_HASH,
             timestamp=params.GENESIS_TIMESTAMP,
             miner="genesis",
             difficulty=0.0,
-            problem={"type": problem_type, "seed": network_seed, "corpus_size": corpus_size},
+            problem=corpus.genesis_spec(),
         )
         chain._append(genesis)
         return chain
@@ -104,10 +110,13 @@ class Blockchain:
             raise ValidationError("empty chain")
         genesis = Block.from_dict(block_dicts[0])
         spec = genesis.problem
-        if not spec or "type" not in spec or "seed" not in spec:
+        if not spec or "type" not in spec:
             raise ValidationError("genesis missing corpus spec")
-        chain = cls(spec["type"], spec["seed"],
-                    int(spec.get("corpus_size", params.CORPUS_SIZE)))
+        try:
+            corpus = corpus_from_genesis(spec)
+        except (OSError, ValueError) as e:
+            raise ValidationError(f"cannot load corpus: {e}")
+        chain = cls(corpus)
         chain._append(genesis)
         for d in block_dicts[1:]:
             chain.add_block(Block.from_dict(d))
@@ -142,7 +151,7 @@ class Blockchain:
         return int(block_hash, 16) % self.corpus_size
 
     def _instance(self, index: int) -> Problem:
-        return new_problem(self.problem_type, f"{self.network_seed}:i:{index}")
+        return self.corpus.instance(index)
 
     def _activate_epoch(self, index: int) -> None:
         """Make instance `index` the active problem. Restores its persisted best
