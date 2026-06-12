@@ -64,8 +64,9 @@ def contact_graph(pdb_text: str, max_res: int):
             seen_chain = chain
         if chain != seen_chain:
             break  # first chain only
+        resseq = int(line[22:26])
         x, y, z = float(line[30:38]), float(line[38:46]), float(line[46:54])
-        cas.append((x, y, z))
+        cas.append((resseq, x, y, z))
         if len(cas) >= max_res:
             break
     n = len(cas)
@@ -73,11 +74,14 @@ def contact_graph(pdb_text: str, max_res: int):
     edges = []
     for i in range(n):
         for j in range(i + 1, n):
-            dx = cas[i][0] - cas[j][0]
-            dy = cas[i][1] - cas[j][1]
-            dz = cas[i][2] - cas[j][2]
+            dx = cas[i][1] - cas[j][1]
+            dy = cas[i][2] - cas[j][2]
+            dz = cas[i][3] - cas[j][3]
             if dx * dx + dy * dy + dz * dz < cutoff2:
-                edges.append([i, j])
+                # backbone (label 1) iff the two residues are sequential in the
+                # real chain numbering; everything else is a tertiary contact.
+                backbone = 1 if abs(cas[i][0] - cas[j][0]) == 1 else 0
+                edges.append([i, j, backbone])
     return n, edges
 
 

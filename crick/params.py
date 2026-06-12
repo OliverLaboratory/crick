@@ -50,6 +50,10 @@ GRAPH_P = 0.5
 # mcs-protein: residues per synthesised protein contact graph (prototype;
 # production loads real ESM Atlas contact maps into the spec instead).
 PROTEIN_RESIDUES = 22
+# A valid common subgraph must match at least this many NON-backbone (tertiary)
+# contact edges, so solutions capture real fold similarity rather than the
+# trivial "align a contiguous backbone segment" match.
+MIN_TERTIARY_EDGES = 2
 
 # docking: integer 3D lattice. Box is roughly DOCKING_BOX^3; the protein is a
 # cloud of PROTEIN_ATOMS, the ligand a rigid cluster of LIGAND_ATOMS.

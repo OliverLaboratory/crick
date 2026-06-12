@@ -91,21 +91,26 @@ class Problem:
 
 # ------------------------------------------------------- shared clique search
 
+def greedy_clique_once(n: int, adjacency: List[int], rng: random.Random) -> List[int]:
+    """One randomized maximal clique. `adjacency[v]` is a bitmask of v's neighbours."""
+    order = list(range(n))
+    rng.shuffle(order)
+    candidates = (1 << n) - 1  # vertices still adjacent to all chosen
+    clique: List[int] = []
+    for v in order:
+        if (candidates >> v) & 1:
+            clique.append(v)
+            candidates &= adjacency[v]
+    return clique
+
+
 def greedy_clique_search(n: int, adjacency: List[int], target_size: int,
                          attempts: int, rng: random.Random) -> Optional[List[int]]:
     """Randomized greedy: return a clique strictly larger than target_size, or
-    None. `adjacency[v]` is a bitmask of v's neighbours. Shared by max-clique
-    and (via the modular product graph) maximum common subgraph."""
+    None. Shared by max-clique and (via the modular product graph) MCS."""
     champion = None
-    order = list(range(n))
     for _ in range(attempts):
-        rng.shuffle(order)
-        candidates = (1 << n) - 1  # vertices still adjacent to all chosen
-        clique: List[int] = []
-        for v in order:
-            if (candidates >> v) & 1:
-                clique.append(v)
-                candidates &= adjacency[v]
+        clique = greedy_clique_once(n, adjacency, rng)
         if len(clique) > target_size:
             target_size = len(clique)
             champion = sorted(clique)

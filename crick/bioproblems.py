@@ -33,7 +33,8 @@ import random
 from itertools import product as iproduct
 from typing import Any, List, Tuple
 
-from .puzzle import (Problem, greedy_clique_search, is_clique, register_problem,
+from . import params
+from .puzzle import (Problem, greedy_clique_once, is_clique, register_problem,
                      seed_rng)
 
 # ============================================================ MCS (proteins)
@@ -44,14 +45,14 @@ class MCSProblem(Problem):
     type = "mcs-protein"
     SCORE_FLOOR = 0
 
-    def __init__(self, name_a: str, edges_a: List[List[int]], size_a: int,
-                 name_b: str, edges_b: List[List[int]], size_b: int):
+    def __init__(self, name_a: str, edges_a, size_a: int,
+                 name_b: str, edges_b, size_b: int):
         self.name_a, self.name_b = name_a, name_b
         self.size_a, self.size_b = size_a, size_b
-        self.edges_a = [tuple(e) for e in edges_a]
-        self.edges_b = [tuple(e) for e in edges_b]
-        self._adj_a = _adjacency_set(edges_a, size_a)
-        self._adj_b = _adjacency_set(edges_b, size_b)
+        # edges may be [i, j] (label derived: backbone iff |i-j|==1) or
+        # [i, j, label] (1 = backbone, 0 = non-backbone tertiary contact).
+        self.edges_a, self._adj_a, self._bb_a = _build(edges_a, size_a)
+        self.edges_b, self._adj_b, self._bb_b = _build(edges_b, size_b)
         # Modular product graph: vertex k <-> residue pair (i, j); edge between
         # (i,j) and (i',j') iff i!=i', j!=j' and the A-edge i~i' agrees with the
         # B-edge j~j'. A clique here is a common induced subgraph isomorphism.
@@ -72,16 +73,36 @@ class MCSProblem(Problem):
                     adj[k2] |= 1 << k1
         return adj
 
+    def _tertiary_edges(self, pairs) -> int:
+        """How many matched edges are non-backbone (tertiary) in BOTH proteins —
+        i.e. a real long-range contact aligned to a real long-range contact."""
+        cnt = 0
+        m = len(pairs)
+        for a in range(m):
+            i1, j1 = pairs[a]
+            for b in range(a + 1, m):
+                i2, j2 = pairs[b]
+                if (i2 in self._adj_a[i1] and i2 not in self._bb_a[i1]
+                        and j2 in self._adj_b[j1] and j2 not in self._bb_b[j1]):
+                    cnt += 1
+                    if cnt >= params.MIN_TERTIARY_EDGES:
+                        return cnt
+        return cnt
+
     # -- consensus path (cheap, exact, integer) --
 
     def verify(self, solution: Any) -> bool:
         if not solution:
             return False
         try:
-            vertices = [self._index[(int(i), int(j))] for i, j in solution]
+            pairs = [(int(i), int(j)) for i, j in solution]
+            vertices = [self._index[p] for p in pairs]
         except (KeyError, TypeError, ValueError):
             return False
-        return is_clique(vertices, self.n, self.adjacency)
+        if not is_clique(vertices, self.n, self.adjacency):
+            return False
+        # reject trivial backbone-only matches: require real tertiary structure
+        return self._tertiary_edges(pairs) >= params.MIN_TERTIARY_EDGES
 
     def score(self, solution: Any) -> int:
         return len(solution) if solution else self.SCORE_FLOOR
@@ -90,18 +111,22 @@ class MCSProblem(Problem):
 
     def improve(self, best, attempts: int = 200, rng=None):
         rng = rng or random.Random()
-        clique = greedy_clique_search(self.n, self.adjacency,
-                                      self.score(best), attempts, rng)
-        if clique is None:
-            return None
-        return [list(self.pairs[k]) for k in clique]
+        champion, champ_size = None, self.score(best)
+        for _ in range(attempts):
+            clique = greedy_clique_once(self.n, self.adjacency, rng)
+            if len(clique) <= champ_size:
+                continue
+            pairs = [self.pairs[k] for k in clique]
+            if self._tertiary_edges(pairs) >= params.MIN_TERTIARY_EDGES:
+                champion, champ_size = [list(p) for p in pairs], len(pairs)
+        return champion
 
     # -- (de)serialization & generation --
 
     def spec(self) -> dict:
         return {"type": self.type,
-                "a": {"name": self.name_a, "size": self.size_a, "edges": [list(e) for e in self.edges_a]},
-                "b": {"name": self.name_b, "size": self.size_b, "edges": [list(e) for e in self.edges_b]}}
+                "a": {"name": self.name_a, "size": self.size_a, "edges": self.edges_a},
+                "b": {"name": self.name_b, "size": self.size_b, "edges": self.edges_b}}
 
     @classmethod
     def from_spec(cls, spec: dict) -> "MCSProblem":
@@ -111,7 +136,6 @@ class MCSProblem(Problem):
 
     @classmethod
     def generate(cls, seed: str) -> "MCSProblem":
-        from . import params
         rng = seed_rng(seed, "mcs")
         na, ea = _synthesize_protein(rng, params.PROTEIN_RESIDUES)
         nb, eb = _synthesize_protein(rng, params.PROTEIN_RESIDUES)
@@ -127,25 +151,34 @@ class MCSProblem(Problem):
                 else f"shared motif of {len(solution)} matched residues")
 
 
-def _adjacency_set(edges, size: int):
-    adj = [set() for _ in range(size)]
-    for u, v in edges:
-        adj[int(u)].add(int(v))
-        adj[int(v)].add(int(u))
-    return adj
+def _build(edges, size: int):
+    """Normalize edges to [i, j, label] and build adjacency + backbone sets."""
+    labeled, adj, bb = [], [set() for _ in range(size)], [set() for _ in range(size)]
+    for e in edges:
+        i, j = int(e[0]), int(e[1])
+        label = int(e[2]) if len(e) > 2 else (1 if abs(i - j) == 1 else 0)
+        labeled.append([i, j, label])
+        adj[i].add(j)
+        adj[j].add(i)
+        if label == 1:
+            bb[i].add(j)
+            bb[j].add(i)
+    return labeled, adj, bb
 
 
 def _synthesize_protein(rng: random.Random, residues: int):
-    """A stand-in contact graph: the backbone chain plus a few long-range
-    tertiary contacts — the shape of a real protein contact map, minus the
-    biology. Replace with an ESM Atlas contact map in production."""
-    edges = [[i, i + 1] for i in range(residues - 1)]
-    extra = max(1, residues // 4)
-    seen = set(map(tuple, edges))
-    for _ in range(extra):
+    """A stand-in contact graph: the backbone chain (label 1) plus long-range
+    tertiary contacts (label 0). Replace with an ESM Atlas contact map in
+    production."""
+    edges = [[i, i + 1, 1] for i in range(residues - 1)]
+    seen = {(i, i + 1) for i in range(residues - 1)}
+    target = max(params.MIN_TERTIARY_EDGES + 1, residues)
+    tries = 0
+    while len([e for e in edges if e[2] == 0]) < target and tries < residues * 8:
+        tries += 1
         i, j = sorted(rng.sample(range(residues), 2))
         if abs(i - j) > 2 and (i, j) not in seen:
-            edges.append([i, j])
+            edges.append([i, j, 0])
             seen.add((i, j))
     return residues, edges
 

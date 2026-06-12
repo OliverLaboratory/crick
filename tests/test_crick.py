@@ -270,6 +270,22 @@ def test_mcs_verify_and_score():
         assert 0 <= i < p.size_a and 0 <= j < p.size_b
 
 
+def test_mcs_requires_tertiary_edges():
+    from crick.bioproblems import MCSProblem
+    # pure backbone paths: no tertiary contacts anywhere
+    path = [[i, i + 1] for i in range(8)]
+    p = MCSProblem("A", path, 9, "B", path, 9)
+    assert p.improve(None, attempts=300) is None       # no >=2-tertiary match exists
+    # a backbone-only mapping is a valid clique but must be REJECTED
+    assert not p.verify([[0, 0], [1, 1], [2, 2]])
+    # add shared tertiary contacts -> now there is a valid common motif
+    g = [[i, i + 1] for i in range(8)] + [[0, 4], [1, 5], [2, 6]]
+    q = MCSProblem("A", g, 9, "B", g, 9)
+    sol = q.improve(None, attempts=300)
+    assert sol and q.verify(sol)
+    assert q._tertiary_edges([tuple(x) for x in sol]) >= 2
+
+
 def test_docking_is_deterministic_and_exact():
     p = new_problem("docking", "seed-y")
     q = new_problem("docking", "seed-y")
@@ -383,10 +399,12 @@ def _write_corpus(tmp_path, proteins):
     return "file://" + str(tmp_path / "manifest.json")
 
 
+# backbone path + tertiary contacts (|i-j|>1); shared tertiary edges let an MCS
+# satisfy the >= MIN_TERTIARY_EDGES requirement
 _DEMO_PROTEINS = [
-    ("P1", 6, [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [0, 3]]),
-    ("P2", 6, [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [1, 4]]),
-    ("P3", 5, [[0, 1], [1, 2], [2, 3], [3, 4], [0, 2]]),
+    ("P1", 6, [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [0, 3], [1, 4], [2, 5]]),
+    ("P2", 6, [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [0, 3], [1, 4], [2, 5]]),
+    ("P3", 5, [[0, 1], [1, 2], [2, 3], [3, 4], [0, 3], [1, 4]]),
 ]
 
 
