@@ -121,6 +121,34 @@
 
   footer { padding: 48px 0 64px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; text-align: center; }
   footer .logo { font-size: 16px; margin-bottom: 8px; }
+
+  .svg-scroll, .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Tablet: let the nav links wrap under the logo */
+  @media (max-width: 760px) {
+    nav { flex-wrap: wrap; gap: 10px 0; }
+    nav .links { width: 100%; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+    nav .links a { margin-left: 0; }
+  }
+
+  /* Phone */
+  @media (max-width: 560px) {
+    .wrap { padding: 0 18px; }
+    .disclaimer { font-size: 12.5px; padding: 10px 18px; }
+    header.hero { padding: 44px 0 40px; }
+    .hero p.tag { font-size: 16px; margin-bottom: 28px; }
+    .cta { flex-direction: column; }
+    .btn { width: 100%; text-align: center; }
+    section { padding: 48px 0; }
+    section h2 { font-size: 24px; }
+    section p.lead { font-size: 15px; margin-bottom: 28px; }
+    .card { padding: 20px; }
+    .term .body, pre.shell { font-size: 12px; padding: 16px; }
+    /* keep the diagram readable: scroll it rather than shrink it to nothing */
+    figure.diagram svg { min-width: 600px; }
+    .diag-legend { gap: 10px 20px; font-size: 13px; }
+    th, td { padding: 9px 10px; font-size: 14px; }
+  }
 </style>
 </head>
 <body>
@@ -203,6 +231,7 @@
     </div>
 
     <figure class="diagram">
+      <div class="svg-scroll">
       <svg viewBox="0 0 768 150" role="img" aria-label="A blockchain where some blocks carry solutions and others do not">
         <!-- chain links: each block points to its parent -->
         <g stroke="#6b7689" stroke-width="2">
@@ -268,6 +297,7 @@
         <text x="720" y="100" text-anchor="middle" fill="#8b94a7" font-size="11" font-family="ui-monospace,monospace">d_b</text>
         <text x="720" y="132" text-anchor="middle" fill="#8b94a7" font-size="12" font-family="ui-monospace,monospace">#7</text>
       </svg>
+      </div>
       <figcaption>Each block links to its parent. Green blocks carry a strictly-better solution
       and are accepted at the reduced difficulty <code>d_r</code>; grey blocks are ordinary
       hash-only blocks at <code>d_b</code>. (After Fig. 1 of the 2019 paper.)</figcaption>
@@ -360,6 +390,7 @@
 <span class="p">$</span> crick status                <span class="c"># chain height, difficulties, balance</span>
 <span class="p">$</span> crick solution              <span class="c"># the best on-chain solution so far</span>
 <span class="p">$</span> crick send --to crk1… --amount 5   <span class="c"># spend your rewards</span></pre>
+    <div class="table-scroll">
     <table>
       <tr><th>Command</th><th>What it does</th></tr>
       <tr><td>crick init</td><td>Create a wallet and the genesis block (stores the puzzle instance)</td></tr>
@@ -369,6 +400,7 @@
       <tr><td>crick solution</td><td>Show and verify the best solution recorded on-chain</td></tr>
       <tr><td>crick send</td><td>Sign and broadcast a transaction via a running node</td></tr>
     </table>
+    </div>
   </section>
 
   <section id="papers" class="papers">
