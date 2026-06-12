@@ -243,6 +243,10 @@
       <strong>maximum clique of their modular product graph</strong>. A solution is a list of residue↔residue
       pairs; <code>score</code> is the number of matched residues. Verifying checks the mapping is a clique in
       the product graph (O(k²) edge lookups); finding it is NP-hard.</p>
+      <p>Contact edges are labeled <strong>backbone</strong> (sequential residues) or <strong>non-backbone</strong>
+      (tertiary contacts). A valid solution must match at least <code>MIN_TERTIARY_EDGES</code> (2) non-backbone
+      contacts in <em>both</em> proteins — otherwise the trivial answer is just aligning a contiguous backbone
+      segment, which every pair of chains shares. The requirement forces solutions to capture real fold similarity.</p>
 
       <h3>max-clique — reference problem</h3>
       <p>Largest clique in a pseudorandom <code>G(n, p)</code> graph derived from the instance seed. Trivial
