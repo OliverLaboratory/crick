@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>crick — protocol specification</title>
+<meta name="description" content="Technical specification of the crick proof-of-work protocol: blocks, dual difficulty, DIPS v2 retargeting, epochs, problems, consensus, and networking.">
+<style>
+  :root {
+    --bg: #0b0e14; --bg-soft: #11151f; --card: #161b27; --line: #232a3a;
+    --text: #dde3ee; --muted: #8b94a7; --accent: #4fd6a5; --accent-2: #6ea8fe;
+    --mono: "SF Mono", ui-monospace, "Cascadia Code", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--text);
+    font: 16px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif; }
+  a { color: var(--accent-2); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, kbd { font-family: var(--mono); font-size: 0.88em; }
+  :not(pre) > code { background: #0d1117; border: 1px solid var(--line); border-radius: 5px;
+    padding: 1px 6px; color: var(--accent-2); }
+
+  .disclaimer { background: #2a2410; border-bottom: 1px solid #4d4216; color: #f0c674;
+    text-align: center; padding: 10px 24px; font-size: 13px; line-height: 1.5; }
+  .disclaimer strong { color: #ffd479; }
+
+  header.top { position: sticky; top: 0; z-index: 20; background: rgba(11,14,20,0.9);
+    backdrop-filter: blur(8px); border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: space-between; padding: 14px 28px; }
+  header.top .logo { font-family: var(--mono); font-weight: 700; font-size: 18px; color: var(--text); }
+  header.top .logo span { color: var(--accent); }
+  header.top nav a { color: var(--muted); margin-left: 22px; font-size: 14px; }
+  header.top nav a:hover { color: var(--text); text-decoration: none; }
+
+  .layout { max-width: 1180px; margin: 0 auto; display: grid;
+    grid-template-columns: 248px minmax(0, 1fr); gap: 48px; padding: 0 28px; }
+
+  .sidebar { position: sticky; top: 64px; align-self: start; height: calc(100vh - 80px);
+    overflow-y: auto; padding: 32px 0; font-size: 14px; }
+  .sidebar .toc-title { color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em;
+    font-size: 11px; margin: 18px 0 8px; }
+  .sidebar a { display: block; color: var(--muted); padding: 4px 10px; border-left: 2px solid transparent;
+    border-radius: 0 4px 4px 0; }
+  .sidebar a:hover { color: var(--text); background: var(--bg-soft); text-decoration: none; }
+  .sidebar ol { list-style: none; counter-reset: s; }
+  .sidebar ol a::before { counter-increment: s; content: counter(s) ". "; color: var(--line); }
+
+  main { padding: 40px 0 96px; min-width: 0; }
+  main h1 { font-size: 34px; letter-spacing: -0.02em; margin-bottom: 6px; }
+  main .subtitle { color: var(--muted); font-size: 17px; margin-bottom: 8px; }
+  main .ver { color: var(--muted); font-family: var(--mono); font-size: 12.5px; margin-bottom: 32px; }
+  section { scroll-margin-top: 72px; padding: 26px 0; border-top: 1px solid var(--line); }
+  section > h2 { font-size: 24px; letter-spacing: -0.01em; margin-bottom: 14px; }
+  section h2 .n { color: var(--accent); font-family: var(--mono); font-size: 16px; margin-right: 10px; }
+  section h3 { font-size: 17px; margin: 24px 0 8px; color: var(--text); }
+  p, ul, ol.steps { margin-bottom: 14px; color: #c3cbda; }
+  ul, ol.steps { padding-left: 22px; }
+  li { margin-bottom: 6px; }
+  strong { color: var(--text); }
+  em.term { font-style: normal; color: var(--accent); }
+
+  pre { background: #0d1117; border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px 18px; overflow-x: auto; margin: 14px 0; font-family: var(--mono);
+    font-size: 13px; line-height: 1.65; color: #c3cbda; }
+  pre .c { color: var(--muted); } pre .k { color: var(--accent-2); } pre .g { color: var(--accent); }
+
+  .eq { background: var(--bg-soft); border: 1px solid var(--line); border-left: 3px solid var(--accent);
+    border-radius: 8px; padding: 12px 16px; margin: 14px 0; font-family: var(--mono); font-size: 13.5px;
+    overflow-x: auto; color: var(--text); }
+
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 14px; display: block; overflow-x: auto; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  td:first-child, td.sym { font-family: var(--mono); color: var(--accent-2); white-space: nowrap; }
+
+  .note { background: var(--bg-soft); border: 1px solid var(--line); border-radius: 8px;
+    padding: 12px 16px; margin: 14px 0; font-size: 14.5px; color: var(--muted); }
+  .note strong { color: var(--text); }
+  .note.warn { border-color: #4d4216; background: #211d10; }
+
+  footer { border-top: 1px solid var(--line); padding: 28px; text-align: center; color: var(--muted); font-size: 13px; }
+
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; gap: 0; }
+    .sidebar { position: static; height: auto; border-bottom: 1px solid var(--line); padding: 16px 0; }
+    header.top { padding: 12px 18px; }
+    header.top nav a { margin-left: 14px; }
+    .layout { padding: 0 18px; }
+    main h1 { font-size: 27px; }
+    section > h2 { font-size: 21px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="disclaimer">
+  ⚠ <strong>Research prototype — beta.</strong> This document describes an experimental
+  protocol. crick is <strong>not</strong> a financial instrument or production cryptocurrency.
+</div>
+
+<header class="top">
+  <div class="logo">crick<span>⛓</span> docs</div>
+  <nav>
+    <a href="./">← Home</a>
+    <a href="https://github.com/OliverLaboratory/crick">GitHub</a>
+  </nav>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="toc-title">Specification</div>
+    <ol>
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#blocks">Blocks &amp; hashing</a></li>
+      <li><a href="#mining">Mining: two paths</a></li>
+      <li><a href="#pow">Proof of work &amp; the target</a></li>
+      <li><a href="#problems">Problems: the verifier contract</a></li>
+      <li><a href="#builtins">The built-in problems</a></li>
+      <li><a href="#retargeting">Difficulty retargeting (DIPS v2)</a></li>
+      <li><a href="#epochs">Epochs &amp; problem rotation</a></li>
+      <li><a href="#tx">Transactions &amp; accounts</a></li>
+      <li><a href="#consensus">Consensus &amp; fork choice</a></li>
+      <li><a href="#network">Networking (P2P)</a></li>
+      <li><a href="#wallets">Wallets &amp; signatures</a></li>
+      <li><a href="#security">Security model</a></li>
+      <li><a href="#validation">Block validation algorithm</a></li>
+      <li><a href="#params">Parameters</a></li>
+      <li><a href="#limits">Determinism &amp; limitations</a></li>
+    </ol>
+  </aside>
+
+  <main>
+    <h1>Protocol specification</h1>
+    <p class="subtitle">How the crick proof-of-work blockchain works, end to end.</p>
+    <p class="ver">Implements DIPS v2 (arXiv:1911.00435) + the multi-puzzle extension (arXiv:1708.09419 §III). Matches reference implementation v0.1.0.</p>
+
+    <section id="overview">
+      <h2><span class="n">1</span>Overview</h2>
+      <p>crick is a Bitcoin-style proof-of-work blockchain with one change to the mining rule:
+      a block can be produced either by ordinary hashing, <em class="term">or</em> by including an
+      improved solution to a scientific problem, in which case it is accepted at a reduced hashing
+      difficulty. Solving is therefore the rational way to earn a block, and the same effort that
+      secures the chain also produces useful results.</p>
+      <p>The design has three pillars, each detailed below:</p>
+      <ul>
+        <li><strong>Dual difficulty.</strong> Two difficulties coexist: <code>d_b</code> for ordinary
+        (“classical”) blocks and <code>d_r &lt; d_b</code> for blocks carrying a better solution.</li>
+        <li><strong>Independent retargeting (DIPS v2).</strong> Each difficulty is retargeted from the
+        production rate of its own block type, and a “drought” of unproductive blocks deepens the discount.</li>
+        <li><strong>Epochs.</strong> The chain works one problem instance at a time, drawn from a large
+        corpus, rotating to the next when the current one is exhausted.</li>
+      </ul>
+      <p>Everything on the consensus path is integer arithmetic and a deterministic function of the
+      block sequence, so any node replaying the chain reaches bit-identical state.</p>
+    </section>
+
+    <section id="blocks">
+      <h2><span class="n">2</span>Blocks &amp; hashing</h2>
+      <p>A block has the following fields:</p>
+      <table>
+        <tr><th>Field</th><th>Meaning</th></tr>
+        <tr><td>height</td><td>Index in the chain; genesis is 0.</td></tr>
+        <tr><td>prev_hash</td><td>Hash of the parent block (links the chain).</td></tr>
+        <tr><td>timestamp</td><td>Unix seconds the block was produced.</td></tr>
+        <tr><td>miner</td><td>Address that receives the block reward.</td></tr>
+        <tr><td>difficulty</td><td>The difficulty this block claims to satisfy (<code>d_b</code> or <code>d_r</code>).</td></tr>
+        <tr><td>transactions</td><td>Ordered list; the first must be the coinbase.</td></tr>
+        <tr><td>solution</td><td>A puzzle solution (any JSON value), or <code>null</code> for a classical block.</td></tr>
+        <tr><td>problem</td><td><em>Genesis only:</em> the corpus spec <code>{type, seed, corpus_size}</code>. Must be <code>null</code> in every other block.</td></tr>
+        <tr><td>nonce</td><td>The value miners vary to satisfy the target.</td></tr>
+      </table>
+      <h3>Block hash</h3>
+      <p>Hashing uses double SHA-256 (<code>sha256d</code>) over a canonical JSON serialization of every
+      field except the nonce, with the nonce appended. Canonical JSON sorts keys and uses compact
+      separators, so the byte string is identical on every node.</p>
+      <div class="eq">base = canonicalJSON({height, prev_hash, timestamp, miner, difficulty, transactions, solution, problem})<br>
+      hash = sha256d( base + ":" + nonce )</div>
+      <p>Separating the nonce lets a miner grind nonces without re-serializing the block body.</p>
+    </section>
+
+    <section id="mining">
+      <h2><span class="n">3</span>Mining: two paths</h2>
+      <p>To extend the tip, a miner produces a block one of two ways:</p>
+      <ol class="steps">
+        <li><strong>Classical.</strong> <code>solution = null</code>. The block must satisfy the base
+        difficulty <code>d_b</code> (standard Bitcoin-style hashing).</li>
+        <li><strong>Solution.</strong> <code>solution</code> is a <em>strictly better</em> answer to the
+        active problem instance than anything previously recorded for it. The block then only needs to
+        satisfy the reduced difficulty <code>d_r</code>.</li>
+      </ol>
+      <p>Because <code>d_r &lt; d_b</code>, finding an improvement is cheaper than out-hashing the network at
+      full difficulty — so miners are paid to do science. A miner runs a solver and a hasher together: if
+      the solver finds a better solution it mines at <code>d_r</code>; otherwise it mines classically at
+      <code>d_b</code>.</p>
+    </section>
+
+    <section id="pow">
+      <h2><span class="n">4</span>Proof of work &amp; the target</h2>
+      <p>Difficulty <code>d</code> maps to a 256-bit target; a block is valid when its hash, read as a
+      big-endian integer, is below that target. Higher difficulty ⇒ smaller target ⇒ more hashing.</p>
+      <div class="eq">target(d) = floor( (2²⁵⁶ − 1) / max(d, 1) )<br>
+      valid ⇔ int(hash, 16) &lt; target(d)</div>
+      <p>A block declares which difficulty it targets in its <code>difficulty</code> field; validators
+      independently recompute the required value (see §<a href="#validation">14</a>) and reject any
+      mismatch, so a miner cannot claim <code>d_r</code> without a qualifying solution.</p>
+    </section>
+
+    <section id="problems">
+      <h2><span class="n">5</span>Problems: the verifier contract</h2>
+      <p>A problem is any object implementing four operations. The contract is what makes a problem safe
+      to use as proof of work:</p>
+      <table>
+        <tr><th>Operation</th><th>Contract</th></tr>
+        <tr><td>verify(s)</td><td>Cheap, exact, deterministic check that <code>s</code> is a well-formed, valid solution. This is the only thing every node runs, so it must be fast.</td></tr>
+        <tr><td>score(s)</td><td>An <strong>integer</strong> where <em>higher is strictly better</em>. <code>score(null)</code> is a floor below any real solution. No floating point — so “is this an improvement?” is an exact comparison every node agrees on.</td></tr>
+        <tr><td>improve(best)</td><td>The (expensive) miner-side search for something better than <code>best</code>. Never trusted; only its output is verified.</td></tr>
+        <tr><td>generate(seed)</td><td>Deterministically construct instance from a seed string (used to build the corpus).</td></tr>
+      </table>
+      <p>The essential asymmetry: <strong>verifying is cheap, finding is hard.</strong> A solution block forces
+      the network to do <em>one</em> verification, but the miner had to search to find it. A strictly-better
+      requirement also neutralizes copying — re-submitting a known solution is never valid, since it does
+      not beat the recorded best.</p>
+    </section>
+
+    <section id="builtins">
+      <h2><span class="n">6</span>The built-in problems</h2>
+      <p>Choose one at genesis with <code>crick init --problem &lt;type&gt;</code>.</p>
+
+      <h3>docking — protein–ligand docking (default)</h3>
+      <p>Find a ligand <em class="term">pose</em> (a rigid placement) with lower energy than the best so far,
+      scored by a fixed energy function on an integer 3D lattice. A pose is
+      <code>{t:[x,y,z], rot:k}</code>: an integer translation plus one of the 24 integer rotation matrices
+      of the cube. Because rotations are integer matrices, placed atom coordinates stay exact integers.</p>
+      <div class="eq">E = Σ<sub>ligand a</sub> Σ<sub>protein p</sub> pot( ‖a − p‖² )  &nbsp; (integer)<br>
+      pot(d²) = CLASH_PENALTY if d² &lt; 4;&nbsp; contact(typeₐ, typeₚ) if d² ≤ 16;&nbsp; 0 otherwise<br>
+      score = −E&nbsp;&nbsp;(lower energy ⇒ higher score)</div>
+      <p>Verifying a pose is one O(|ligand|·|protein|) integer sum; finding a low-energy pose means searching
+      rotations × translations. Poses must keep the ligand inside the binding box.</p>
+
+      <h3>mcs-protein — maximum common subgraph</h3>
+      <p>The largest substructure shared by two protein contact graphs — which is exactly the
+      <strong>maximum clique of their modular product graph</strong>. A solution is a list of residue↔residue
+      pairs; <code>score</code> is the number of matched residues. Verifying checks the mapping is a clique in
+      the product graph (O(k²) edge lookups); finding it is NP-hard.</p>
+
+      <h3>max-clique — reference problem</h3>
+      <p>Largest clique in a pseudorandom <code>G(n, p)</code> graph derived from the instance seed. Trivial
+      exact verification and a short improvement ladder; used to exercise the protocol itself.</p>
+    </section>
+
+    <section id="retargeting">
+      <h2><span class="n">7</span>Difficulty retargeting (DIPS v2)</h2>
+      <p>crick uses DIPS protocol <strong>v2, “independent updates.”</strong> The two difficulties are
+      retargeted separately, each from the production rate of its own block type. <code>η</code> (eta) is only
+      the <em>initial</em> ratio <code>d_r/d_b</code>; it is not enforced afterward.</p>
+
+      <h3>Base difficulty d_b</h3>
+      <p>After every <code>CLASSICAL_WINDOW</code> classical blocks, <code>d_b</code> retargets to hold classical
+      production at <code>CLASSICAL_BLOCK_TIME</code> per block:</p>
+      <div class="eq">t* = (elapsed over the window) / CLASSICAL_WINDOW<br>
+      d_b ← clamp( d_b · CLASSICAL_BLOCK_TIME / t*,&nbsp; d_b/x,&nbsp; d_b·x ),&nbsp; floored at MIN_DIFFICULTY</div>
+
+      <h3>Reduced difficulty d_r</h3>
+      <p>After every <code>SOLUTION_WINDOW</code> solution blocks, <code>d_r</code> retargets to hold solution
+      production at <code>SOLUTION_BLOCK_TIME</code> per block (same formula, solution timing). If solutions
+      arrive too fast — e.g. on an easy instance — this drives <code>d_r</code> back up.</p>
+
+      <h3>Drought rule</h3>
+      <p>If <code>CLASSICAL_WINDOW</code> consecutive classical blocks pass with no solution, <code>d_r</code> is
+      cut by the max factor <code>x</code> (floored at <code>MIN_REDUCED_DIFFICULTY</code>). So as a problem
+      hardens, the discount deepens — and hoarding a solution risks someone else publishing first at an
+      ever-cheaper <code>d_r</code>. Every update is clamped to a factor of <code>x</code> per step.</p>
+    </section>
+
+    <section id="epochs">
+      <h2><span class="n">8</span>Epochs &amp; problem rotation</h2>
+      <p>The genesis block defines a <strong>corpus</strong> — a problem type, a seed, and a size — rather than
+      a single puzzle. Instance <code>i</code> is <code>generate("{seed}:i:{i}")</code>. The chain optimizes one
+      instance per <em class="term">epoch</em>.</p>
+
+      <h3>Rotation</h3>
+      <p>An epoch ends when the instance <strong>saturates</strong>: <code>SATURATION_WINDOW</code> consecutive
+      blocks find no improvement (a hard <code>MAX_EPOCH</code> cap is a backstop). The next instance index is
+      derived from the hash of the rotating block:</p>
+      <div class="eq">index ← int( rotating_block.hash, 16 ) mod CORPUS_SIZE</div>
+      <p>This is deliberately <strong>unpredictable</strong> (you cannot pre-compute which instance comes next,
+      so you cannot stockpile solutions) and <strong>unchooseable</strong> (miners cannot cherry-pick the easiest
+      fresh instance). Holding an instance for a whole epoch — rather than switching every block — is what lets
+      it be optimized to depth.</p>
+
+      <h3>Why d_b is global but d_r resets</h3>
+      <p><code>d_b</code> tracks network hashrate and security, so it is <strong>continuous across epochs</strong>.
+      <code>d_r</code> is the per-problem discount and <strong>resets to <code>d_b·η</code></strong> on every
+      rotation. The reset matters: a fresh instance is trivially improvable, so without it a miner could farm
+      cheap discounted blocks on each new instance. Resetting <code>d_r</code> forces the discount to re-earn
+      itself (via droughts) as the new instance hardens.</p>
+
+      <h3>Per-instance memory</h3>
+      <p>The chain remembers the best score reached for each instance. Revisiting an instance does not reset it
+      — a new solution must still beat that instance’s recorded history.</p>
+    </section>
+
+    <section id="tx">
+      <h2><span class="n">9</span>Transactions &amp; accounts</h2>
+      <p>crick uses an account model (balances + per-sender nonces), not UTXOs.</p>
+      <ul>
+        <li>A transaction is <code>{sender, recipient, amount, nonce, pubkey, signature}</code>. Its id is
+        <code>sha256d(payload + signature)</code>, where <code>payload</code> is the canonical JSON of everything
+        but the signature.</li>
+        <li>The sender’s <code>nonce</code> must equal the number of transactions they have already sent
+        (replay protection), the amount must be positive, and the sender must have sufficient balance.</li>
+        <li>The first transaction in every block is the <strong>coinbase</strong>: sender <code>"coinbase"</code>,
+        amount <code>BLOCK_REWARD</code>, and its nonce equals the block height (keeping coinbase ids unique). No
+        other coinbase is allowed.</li>
+      </ul>
+      <p>Balances and nonces are derived state: replaying blocks from genesis reconstructs them exactly.</p>
+    </section>
+
+    <section id="consensus">
+      <h2><span class="n">10</span>Consensus &amp; fork choice</h2>
+      <p>The valid chain is the one with the most <strong>accumulated work</strong>, defined as the sum of every
+      block’s declared difficulty:</p>
+      <div class="eq">totalWork = Σ block.difficulty</div>
+      <p>A node adopts a peer’s chain only if it shares the same genesis hash and has strictly greater total work
+      — and only after <strong>fully re-validating</strong> it from genesis (every signature, difficulty, solution,
+      epoch transition, and balance). Note that solution blocks contribute their <em>reduced</em> difficulty to
+      total work, so cheap solution blocks add less security weight than classical ones.</p>
+    </section>
+
+    <section id="network">
+      <h2><span class="n">11</span>Networking (P2P)</h2>
+      <p>Nodes gossip over plain HTTP/JSON. Peers are seeded manually with <code>--peer</code>.</p>
+      <table>
+        <tr><th>Endpoint</th><th>Purpose</th></tr>
+        <tr><td>GET /status</td><td>Height, tip, <code>d_b</code>, <code>d_r</code>, best score, peers, balance.</td></tr>
+        <tr><td>GET /chain</td><td>The full chain as JSON (used for sync).</td></tr>
+        <tr><td>GET /solution</td><td>The best solution recorded for the active instance.</td></tr>
+        <tr><td>POST /blocks</td><td>Submit a new block; on a fork/gap the node syncs from the sender.</td></tr>
+        <tr><td>POST /tx</td><td>Submit a signed transaction to the mempool.</td></tr>
+        <tr><td>GET/POST /peers</td><td>List / announce peers.</td></tr>
+      </table>
+      <p>When a node mines or accepts a new tip it broadcasts the block to its peers. If an announced block does
+      not extend the tip, the node fetches the sender’s chain and applies the fork-choice rule above.</p>
+    </section>
+
+    <section id="wallets">
+      <h2><span class="n">12</span>Wallets &amp; signatures</h2>
+      <p>Keys are ECDSA on <strong>secp256k1</strong> (the Bitcoin curve), signed deterministically. An address is
+      derived from the public key:</p>
+      <div class="eq">address = "crk1" + sha256( pubkey_bytes ).hex()[:40]</div>
+      <p>A transaction is valid only if its <code>pubkey</code> hashes to its <code>sender</code> address and the
+      signature verifies against the canonical payload. Wallets are stored locally; the private key never leaves
+      the node.</p>
+    </section>
+
+    <section id="security">
+      <h2><span class="n">13</span>Security model</h2>
+      <ul>
+        <li><strong>51% attacks</strong> apply as in any PoW chain: an entity with majority work can reorg. Solution
+        blocks carry reduced weight, so a network where most blocks are solution blocks has proportionally less
+        hashing security — a tension the operator tunes via <code>η</code> and the windows.</li>
+        <li><strong>Bubka attack</strong> (hoarding a run of successive solutions to win many blocks or fork cheaply):
+        mitigated by keeping <code>SOLUTION_WINDOW</code> small, so rapid solution blocks quickly retarget
+        <code>d_r</code> upward, plus the unpredictable next-instance selection (you can’t stockpile solutions for an
+        instance you can’t predict).</li>
+        <li><strong>Cheap-instance farming</strong>: prevented by resetting <code>d_r</code> each epoch and by making
+        the active instance unchooseable (hash-selected), so a miner cannot keep hopping to trivially-improvable
+        instances at a deep discount.</li>
+        <li><strong>Solution copying / front-running</strong>: a copied solution never beats the recorded best, so it
+        is invalid; the strictly-better rule makes plagiarism worthless on its own.</li>
+        <li><strong>Determinism is consensus-critical</strong>: verification and scoring are integer-only so all nodes
+        agree exactly. Any floating-point or nondeterministic verifier would fork the chain.</li>
+      </ul>
+    </section>
+
+    <section id="validation">
+      <h2><span class="n">14</span>Block validation algorithm</h2>
+      <p>A block extending the tip is accepted only if every check passes, in order:</p>
+      <pre><span class="c"># structural</span>
+1.  height == tip.height + 1
+2.  prev_hash == tip.hash
+3.  problem field is null            <span class="c"># only genesis carries the corpus spec</span>
+4.  timestamp ≥ tip.timestamp − MAX_BACKWARD_DRIFT
+5.  timestamp ≤ now + MAX_FUTURE_DRIFT
+
+<span class="c"># which difficulty must this block meet?</span>
+6.  if block has a solution:
+        verify(solution) is true
+        score(solution) &gt; best score for the active instance
+        required = d_r
+    else:
+        required = d_b
+7.  block.difficulty == required
+8.  int(block.hash, 16) &lt; target(required)
+
+<span class="c"># transactions</span>
+9.  tx[0] is the coinbase (amount == BLOCK_REWARD, nonce == height); no other coinbase
+10. each other tx: valid signature, amount &gt; 0, nonce == sender's count, sufficient balance
+
+<span class="c"># on success: append, update difficulty schedule, maybe rotate the epoch</span></pre>
+    </section>
+
+    <section id="params">
+      <h2><span class="n">15</span>Parameters</h2>
+      <p>Consensus constants in the reference implementation (<code>crick/params.py</code>):</p>
+      <table>
+        <tr><th>Name</th><th>Value</th><th>Meaning</th></tr>
+        <tr><td class="sym">INITIAL_DIFFICULTY</td><td>1000</td><td>d_b at genesis (≈ expected hashes per classical block).</td></tr>
+        <tr><td class="sym">INITIAL_ETA</td><td>0.5</td><td>Initial d_r/d_b ratio (not enforced after).</td></tr>
+        <tr><td class="sym">CLASSICAL_WINDOW</td><td>16</td><td>Classical blocks per d_b retarget; also the drought length.</td></tr>
+        <tr><td class="sym">SOLUTION_WINDOW</td><td>5</td><td>Solution blocks per d_r retarget (small ⇒ Bubka defense).</td></tr>
+        <tr><td class="sym">CLASSICAL_BLOCK_TIME</td><td>30 s</td><td>Target time per classical block.</td></tr>
+        <tr><td class="sym">SOLUTION_BLOCK_TIME</td><td>60 s</td><td>Target time per solution block.</td></tr>
+        <tr><td class="sym">MAX_RETARGET_FACTOR</td><td>4</td><td>Per-update clamp (x); also the drought cut factor.</td></tr>
+        <tr><td class="sym">MIN_DIFFICULTY</td><td>16</td><td>Floor for d_b.</td></tr>
+        <tr><td class="sym">MIN_REDUCED_DIFFICULTY</td><td>1</td><td>Floor for d_r (a solution block is never free).</td></tr>
+        <tr><td class="sym">CORPUS_SIZE</td><td>1,000,000</td><td>Number of instances chain entropy selects among.</td></tr>
+        <tr><td class="sym">SATURATION_WINDOW</td><td>64</td><td>Consecutive no-improvement blocks before rotating.</td></tr>
+        <tr><td class="sym">MAX_EPOCH</td><td>4096</td><td>Hard cap on epoch length (backstop).</td></tr>
+        <tr><td class="sym">BLOCK_REWARD</td><td>50</td><td>Coinbase reward per block (CRK).</td></tr>
+        <tr><td class="sym">MAX_FUTURE_DRIFT</td><td>120 s</td><td>How far ahead of wall-clock a timestamp may be.</td></tr>
+        <tr><td class="sym">MAX_BACKWARD_DRIFT</td><td>60 s</td><td>How far behind its parent a timestamp may be.</td></tr>
+      </table>
+    </section>
+
+    <section id="limits">
+      <h2><span class="n">16</span>Determinism &amp; limitations</h2>
+      <p>This is a research prototype. Known limitations:</p>
+      <ul>
+        <li><strong>Synthetic instances.</strong> For now <code>docking</code> and <code>mcs-protein</code> instances are
+        synthesized deterministically from the seed so the package runs with no external data. Real deployment loads
+        ESM Atlas contact maps / Enamine ligands into the same instance spec — the verifier and scorer are unchanged.</li>
+        <li><strong>Instance generation PRNG.</strong> Instance synthesis uses Python’s RNG, so cross-language nodes
+        would need a specified PRNG. The consensus path (verify/score) is already pure integer arithmetic and is
+        language-agnostic.</li>
+        <li><strong>Networking.</strong> HTTP gossip with manual peer seeding — no peer discovery, NAT traversal, or
+        encrypted transport.</li>
+        <li><strong>Single chain head.</strong> Fork choice re-validates whole chains rather than maintaining a header
+        tree; fine at research scale.</li>
+      </ul>
+      <p>See the <a href="https://github.com/OliverLaboratory/crick">source</a> for the authoritative behavior, and the
+      two papers for the underlying theory.</p>
+    </section>
+  </main>
+</div>
+
+<footer>crick — research prototype · <a href="./">home</a> · <a href="https://github.com/OliverLaboratory/crick">github</a></footer>
+
+</body>
+</html>
